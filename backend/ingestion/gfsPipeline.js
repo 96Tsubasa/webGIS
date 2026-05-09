@@ -36,10 +36,17 @@ function getCycle() {
   return "00";
 }
 
-// ====== PATH ======
+function formatCompact(date) {
+  const y = date.getUTCFullYear();
 
-function getRunDir(date, cycle) {
-  return path.join(DATA_DIR, `${date}_${cycle}`);
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+
+  const h = String(date.getUTCHours()).padStart(2, "0");
+  const min = String(date.getUTCMinutes()).padStart(2, "0");
+  const s = String(date.getUTCSeconds()).padStart(2, "0");
+
+  return `${y}${m}${d}T${h}${min}${s}`;
 }
 
 // ====== CLEANUP ======
@@ -103,7 +110,7 @@ function convertToTif(gribPath, tifPath) {
       return resolve(tifPath);
     }
 
-    const cmd = `gdal_translate -of GTiff -b 1 "${gribPath}" "${tifPath}"`;
+    const cmd = `gdal_translate -of GTiff -ot Float32 -a_srs EPSG:4326 "${gribPath}" "${tifPath}"`;
 
     exec(cmd, (err, stdout, stderr) => {
       if (err) {
@@ -115,6 +122,115 @@ function convertToTif(gribPath, tifPath) {
   });
 }
 
+// ====== PUBLISH ======
+
+async function storeExists(workspace, layerName) {
+
+  const url =
+    `http://geoserver:8080/geoserver/rest/workspaces/` +
+    `${workspace}/coveragestores/${layerName}.json`;
+
+  try {
+
+    await axios.get(url, {
+      auth: {
+        username: "admin",
+        password: "geoserver"
+      }
+    });
+
+    return true;
+
+  } catch (err) {
+
+    if (err.response?.status === 404) {
+      return false;
+    }
+
+    throw err;
+  }
+}
+
+async function setLayerStyle(layerName) {
+
+  const url =
+    `http://geoserver:8080/geoserver/rest/layers/` +
+    `weather:${layerName}.json`;
+
+  await axios.put(
+    url,
+    {
+      layer: {
+        defaultStyle: {
+          name: "temperature_style"
+        }
+      }
+    },
+    {
+      headers: {
+        "Content-Type": "application/json"
+      },
+      auth: {
+        username: "admin",
+        password: "geoserver"
+      }
+    }
+  );
+}
+
+async function publishGeoTiff(layerName, tifPath) {
+
+  const workspace = "weather";
+
+  try {
+
+    const exists = await storeExists(
+      workspace,
+      layerName
+    );
+
+    if (exists) {
+
+      console.log(
+        `Skip existing store: ${layerName}`
+      );
+
+      return;
+    }
+
+    const url =
+      `http://geoserver:8080/geoserver/rest/workspaces/` +
+      `${workspace}/coveragestores/${layerName}/file.geotiff`;
+
+    const fileBuffer = fs.readFileSync(tifPath);
+
+    await axios.put(
+      url,
+      fileBuffer,
+      {
+        headers: {
+          "Content-Type": "image/tiff"
+        },
+        auth: {
+          username: "admin",
+          password: "geoserver"
+        },
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity
+      }
+    );
+
+    console.log(`Published ${layerName}`);
+
+  } catch (err) {
+
+    console.error(
+      `Publish failed ${layerName}:`,
+      err.response?.data || err.message
+    );
+  }
+}
+
 // ====== MAIN ======
 
 async function run() {
@@ -123,9 +239,8 @@ async function run() {
 
   console.log(`\n=== RUN ${date}_${cycle} ===`);
 
-  const runDir = getRunDir(date, cycle);
-  const gribDir = path.join(runDir, "grib");
-  const tifDir = path.join(runDir, "geotiff");
+  const gribDir = path.join(DATA_DIR, "grib");
+  const tifDir = path.join(DATA_DIR, "geotiff");
 
   // tạo đúng cấu trúc
   fs.mkdirSync(gribDir, { recursive: true });
@@ -141,9 +256,16 @@ async function run() {
   };
 
   for (let h = 0; h <= MAX_FORECAST_HOUR; h += FORECAST_STEP) {
+    const runTime = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${cycle}:00:00Z`);
+
+    const validTime = new Date(runTime.getTime() + h * 3600 * 1000);
+
     const fStr = String(h).padStart(3, "0");
 
-    const fileName = `gfs_${date}_${cycle}_f${fStr}`;
+    // const fileName = `gfs_${date}_${cycle}_f${fStr}`;
+    const timeStr = formatCompact(validTime);
+    const fileName = `tmp_${timeStr}`;
+
     const gribPath = path.join(gribDir, `${fileName}.grib2`);
     const tifPath = path.join(tifDir, `${fileName}.tif`);
 
@@ -165,13 +287,22 @@ async function run() {
       console.log(`Converting f${fStr}...`);
       await convertToTif(gribPath, tifPath);
 
+      console.log(`Publishing f${fStr}...`);
+      await publishGeoTiff(
+        `gfs_${timeStr}`,
+        tifPath
+      );
+
+      console.log(`Styling f${fStr}...`);
+      await setLayerStyle(`gfs_${timeStr}`);
+
       console.log(`Done f${fStr}`);
     } catch (err) {
       console.error(`Error f${fStr}:`, err.message);
     }
   }
 
-  cleanupOldRuns();
+  // cleanupOldRuns();
 
   console.log("=== DONE RUN ===\n");
 }
