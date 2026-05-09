@@ -12,12 +12,27 @@
 </head>
 <body>
   <div id="map"></div>
+  <div id="timeline-container">
+
+    <button id="play-btn">Play</button>
+
+    <input
+      type="range"
+      id="time-slider"
+      min="0"
+      max="0"
+      value="0"
+      step="1"
+    />
+
+    <span id="time-label">
+      No data
+    </span>
+
+  </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="main.js"></script>
-
-  <script src="https://unpkg.com/georaster"></script>
-  <script src="https://unpkg.com/georaster-layer-for-leaflet"></script>
 </body>
 </html>

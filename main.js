@@ -2,6 +2,24 @@ const map = L.map('map').setView([16.311, 106.062], 6);
 let weatherLayer = null;
 let timestamps = [];
 let currentIndex = 0;
+let isPlaying = false;
+let playbackInterval = null;
+
+const slider = document.getElementById("time-slider");
+const label = document.getElementById("time-label");
+const playBtn = document.getElementById("play-btn");
+
+// Helper functions
+function formatTimestamp(ts) {
+
+  const year = ts.slice(0,4);
+  const month = ts.slice(4,6);
+  const day = ts.slice(6,8);
+
+  const hour = ts.slice(9,11);
+
+  return `${hour}:00 ${day}/${month}/${year}`;
+}
 
 // Base layers
 const osm = L.tileLayer(
@@ -37,30 +55,23 @@ function renderWeatherLayer(layerName) {
       layers: `weather:${layerName}`,
       format: "image/png",
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.55,
       zIndex: 1000
     }
   );
 
   weatherLayer.addTo(map);
 
+  // update UI
+  slider.value = currentIndex;
+
+  label.innerText =
+    formatTimestamp(
+      timestamps[currentIndex].timestamp
+    );
+
   console.log("Showing:", layerName);
 }
-
-// Dùng các thư viện để render GeoTIFF ở frontend
-// fetch("data/MOD13Q1_NDVI_20120101.tif")
-//   .then(res => res.arrayBuffer())
-//   .then(arrayBuffer => parseGeoraster(arrayBuffer))
-//   .then(georaster => {
-//     const layer = new GeoRasterLayer({
-//       georaster: georaster,
-//       opacity: 0.7,
-//       resolution: 256,
-//       zIndex: 1000
-//     });
-
-//     layer.addTo(map);
-//   });
 
 // Load timestamps from backend
 fetch("http://localhost:3000/api/timestamps")
@@ -68,6 +79,7 @@ fetch("http://localhost:3000/api/timestamps")
   .then(data => {
 
     timestamps = data;
+    slider.max = timestamps.length - 1;
 
     if (timestamps.length === 0) {
       console.log("No weather layers");
@@ -79,9 +91,38 @@ fetch("http://localhost:3000/api/timestamps")
     renderWeatherLayer(
       timestamps[currentIndex].layer
     );
-
   })
   .catch(err => console.error(err));
+
+slider.addEventListener("input", () => {
+
+  currentIndex = parseInt(slider.value);
+
+  renderWeatherLayer(
+    timestamps[currentIndex].layer
+  );
+
+});
+
+playBtn.addEventListener("click", () => {
+
+  isPlaying = !isPlaying;
+
+  if (isPlaying) {
+
+    playBtn.innerText = "Pause";
+
+    startPlayback();
+
+  } else {
+
+    playBtn.innerText = "Play";
+
+    stopPlayback();
+
+  }
+
+});
 
 function nextFrame() {
 
@@ -98,9 +139,21 @@ function nextFrame() {
   );
 }
 
-setInterval(() => {
-  nextFrame();
-}, 2000);
+function startPlayback() {
+
+  playbackInterval = setInterval(() => {
+
+    nextFrame();
+
+  }, 2000);
+
+}
+
+function stopPlayback() {
+
+  clearInterval(playbackInterval);
+
+}
 
 // AQI Data
 fetch("http://localhost:3000/api/aqi")
