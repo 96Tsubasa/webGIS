@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    container_name: backend
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - ./backend/data:/data
+    ports:
+      - "3000:3000"
+    depends_on:
+      - geoserver
+
+  geoserver:
+    image: kartoza/geoserver:latest
+    container_name: geoserver
+    ports:
+      - "8080:8080"
+    environment:
+      - GEOSERVER_ADMIN_USER=admin
+      - GEOSERVER_ADMIN_PASSWORD=geoserver
+    volumes:
+      - geoserver_data:/opt/geoserver/data_dir
+      - ./backend/data/geotiff:/data/geotiff
+    restart: unless-stopped
+
+volumes:
+  geoserver_data:
