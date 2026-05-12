@@ -9,6 +9,7 @@ const BASE_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl";
 const MAX_FORECAST_HOUR = 72;
 const FORECAST_STEP = 1;
 const MAX_RUNS_TO_KEEP = 3;
+const RETENTION_DAYS = 3;
 
 // luôn dùng /data khi chạy Docker
 const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, "../data");
@@ -49,33 +50,124 @@ function formatCompact(date) {
   return `${y}${m}${d}T${h}${min}${s}`;
 }
 
+function parseTimestampFromFilename(fileName) {
+
+  const match =
+    fileName.match(/(\d{8}T\d{6})/);
+
+  if (!match) return null;
+
+  const ts = match[1];
+
+  const year = ts.slice(0, 4);
+  const month = ts.slice(4, 6);
+  const day = ts.slice(6, 8);
+
+  const hour = ts.slice(9, 11);
+  const minute = ts.slice(11, 13);
+  const second = ts.slice(13, 15);
+
+  return new Date(
+    `${year}-${month}-${day}T${hour}:${minute}:${second}Z`
+  );
+}
+
 // ====== CLEANUP ======
 
-function cleanupOldRuns() {
-  if (!fs.existsSync(DATA_DIR)) return;
+async function cleanupOldData() {
 
-  const entries = fs.readdirSync(DATA_DIR);
+  const tifDir = path.join(DATA_DIR, "geotiff");
+  const gribDir = path.join(DATA_DIR, "grib");
 
-  const runs = entries
-    .map(name => {
-      const fullPath = path.join(DATA_DIR, name);
-      if (!fs.statSync(fullPath).isDirectory()) return null;
+  const now = Date.now();
 
-      return {
-        name,
-        time: fs.statSync(fullPath).mtime.getTime()
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.time - a.time);
+  const maxAge =
+    RETENTION_DAYS * 24 * 3600 * 1000;
 
-  const toDelete = runs.slice(MAX_RUNS_TO_KEEP);
+  if (!fs.existsSync(tifDir)) return;
 
-  toDelete.forEach(dir => {
-    const fullPath = path.join(DATA_DIR, dir.name);
-    console.log("Deleting old run:", fullPath);
-    fs.rmSync(fullPath, { recursive: true, force: true });
-  });
+  const tifFiles = fs
+    .readdirSync(tifDir)
+    .filter(f => f.endsWith(".tif"));
+
+  for (const tifFile of tifFiles) {
+
+    const fileDate =
+      parseTimestampFromFilename(tifFile);
+
+    if (!fileDate) continue;
+
+    const age =
+      now - fileDate.getTime();
+
+    if (age < maxAge) continue;
+
+    const timestamp =
+      tifFile.match(/(\d{8}T\d{6})/)[1];
+
+    const layerName =
+      `gfs_${timestamp}`;
+
+    const tifPath =
+      path.join(tifDir, tifFile);
+
+    const gribPath =
+      path.join(
+        gribDir,
+        tifFile.replace(".tif", ".grib2")
+      );
+
+    console.log(
+      `Deleting old data: ${timestamp}`
+    );
+
+    // delete geoserver
+    await deleteGeoServerLayer(layerName);
+
+    // delete tif
+    if (fs.existsSync(tifPath)) {
+      fs.unlinkSync(tifPath);
+    }
+
+    // delete grib
+    if (fs.existsSync(gribPath)) {
+      fs.unlinkSync(gribPath);
+    }
+
+    console.log(
+      `Deleted old dataset: ${timestamp}`
+    );
+  }
+}
+
+async function deleteGeoServerLayer(layerName) {
+
+  const workspace = "weather";
+
+  const url =
+    `http://geoserver:8080/geoserver/rest/workspaces/` +
+    `${workspace}/coveragestores/${layerName}` +
+    `?recurse=true`;
+
+  try {
+
+    await axios.delete(url, {
+      auth: {
+        username: "admin",
+        password: "geoserver"
+      }
+    });
+
+    console.log(`Deleted GeoServer layer: ${layerName}`);
+
+  } catch (err) {
+
+    console.error(
+      `Failed deleting layer ${layerName}:`,
+      err.response?.data || err.message
+    );
+
+  }
 }
 
 // ====== DOWNLOAD ======
@@ -302,7 +394,7 @@ async function run() {
     }
   }
 
-  // cleanupOldRuns();
+  await cleanupOldData();
 
   console.log("=== DONE RUN ===\n");
 }
