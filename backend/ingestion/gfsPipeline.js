@@ -3,179 +3,166 @@ const fs = require("fs");
 const path = require("path");
 const { exec } = require("child_process");
 
-const BASE_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl";
+const BASE_URL =
+  "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl";
 
-// ====== CONFIG ======
+const DATA_DIR =
+  process.env.DATA_DIR || "/data";
+
 const MAX_FORECAST_HOUR = 72;
 const FORECAST_STEP = 1;
-const MAX_RUNS_TO_KEEP = 3;
-const RETENTION_DAYS = 3;
 
-// luôn dùng /data khi chạy Docker
-const DATA_DIR = process.env.DATA_DIR || path.resolve(__dirname, "../data");
+// ===== DIRECTORIES =====
 
+const GRIB_DIR =
+  path.join(DATA_DIR, "grib", "temperature");
 
-// ====== TIME ======
+const MOSAIC_DIR =
+  path.join(DATA_DIR, "mosaic", "temperature");
+
+// ===== TIME =====
 
 function getStableDate() {
+
   const now = new Date();
-  now.setUTCDate(now.getUTCDate() - 1);
 
-  const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(now.getUTCDate()).padStart(2, "0");
+  now.setUTCDate(
+    now.getUTCDate() - 1
+  );
 
-  return `${y}${m}${d}`;
+  return (
+    now.getUTCFullYear() +
+    String(now.getUTCMonth() + 1).padStart(2, "0") +
+    String(now.getUTCDate()).padStart(2, "0")
+  );
 }
 
 function getCycle() {
-  const hour = new Date().getUTCHours();
+
+  const hour =
+    new Date().getUTCHours();
 
   if (hour >= 18) return "18";
   if (hour >= 12) return "12";
   if (hour >= 6) return "06";
+
   return "00";
 }
 
-function formatCompact(date) {
+// IMPORTANT:
+// GeoServer parses this natively
+function formatGeoServerTime(date) {
+
   const y = date.getUTCFullYear();
 
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
+  const m =
+    String(date.getUTCMonth() + 1)
+      .padStart(2, "0");
 
-  const h = String(date.getUTCHours()).padStart(2, "0");
-  const min = String(date.getUTCMinutes()).padStart(2, "0");
-  const s = String(date.getUTCSeconds()).padStart(2, "0");
+  const d =
+    String(date.getUTCDate())
+      .padStart(2, "0");
 
-  return `${y}${m}${d}T${h}${min}${s}`;
+  const h =
+    String(date.getUTCHours())
+      .padStart(2, "0");
+
+  return `${y}${m}${d}T${h}0000`;
 }
 
-function parseTimestampFromFilename(fileName) {
+// ===== FILE HELPERS =====
 
-  const match =
-    fileName.match(/(\d{8}T\d{6})/);
+function ensureDirs() {
 
-  if (!match) return null;
+  fs.mkdirSync(GRIB_DIR, {
+    recursive: true
+  });
 
-  const ts = match[1];
-
-  const year = ts.slice(0, 4);
-  const month = ts.slice(4, 6);
-  const day = ts.slice(6, 8);
-
-  const hour = ts.slice(9, 11);
-  const minute = ts.slice(11, 13);
-  const second = ts.slice(13, 15);
-
-  return new Date(
-    `${year}-${month}-${day}T${hour}:${minute}:${second}Z`
-  );
+  fs.mkdirSync(MOSAIC_DIR, {
+    recursive: true
+  });
 }
 
-// ====== CLEANUP ======
+function ensureMosaicFiles() {
 
-async function cleanupOldData() {
-
-  const tifDir = path.join(DATA_DIR, "geotiff");
-  const gribDir = path.join(DATA_DIR, "grib");
-
-  const now = Date.now();
-
-  const maxAge =
-    RETENTION_DAYS * 24 * 3600 * 1000;
-
-  if (!fs.existsSync(tifDir)) return;
-
-  const tifFiles = fs
-    .readdirSync(tifDir)
-    .filter(f => f.endsWith(".tif"));
-
-  for (const tifFile of tifFiles) {
-
-    const fileDate =
-      parseTimestampFromFilename(tifFile);
-
-    if (!fileDate) continue;
-
-    const age =
-      now - fileDate.getTime();
-
-    if (age < maxAge) continue;
-
-    const timestamp =
-      tifFile.match(/(\d{8}T\d{6})/)[1];
-
-    const layerName =
-      `gfs_${timestamp}`;
-
-    const tifPath =
-      path.join(tifDir, tifFile);
-
-    const gribPath =
-      path.join(
-        gribDir,
-        tifFile.replace(".tif", ".grib2")
-      );
-
-    console.log(
-      `Deleting old data: ${timestamp}`
+  const indexerPath =
+    path.join(
+      MOSAIC_DIR,
+      "indexer.properties"
     );
 
-    // delete geoserver
-    await deleteGeoServerLayer(layerName);
+  if (!fs.existsSync(indexerPath)) {
 
-    // delete tif
-    if (fs.existsSync(tifPath)) {
-      fs.unlinkSync(tifPath);
-    }
-
-    // delete grib
-    if (fs.existsSync(gribPath)) {
-      fs.unlinkSync(gribPath);
-    }
+    fs.writeFileSync(
+      indexerPath,
+`TimeAttribute=time
+Schema=*the_geom:Polygon,location:String,time:java.util.Date
+PropertyCollectors=TimestampFileNameExtractorSPI[timeregex](time)
+Caching=false
+AbsolutePath=true
+CanBeEmpty=true
+`
+    );
 
     console.log(
-      `Deleted old dataset: ${timestamp}`
+      "Created indexer.properties"
+    );
+  }
+
+  const timeregexPath =
+    path.join(
+      MOSAIC_DIR,
+      "timeregex.properties"
+    );
+
+  if (!fs.existsSync(timeregexPath)) {
+
+    fs.writeFileSync(
+      timeregexPath,
+`regex=[0-9]{8}T[0-9]{6}
+format=yyyyMMdd'T'HHmmss
+`
+    );
+
+    console.log(
+      "Created timeregex.properties"
+    );
+  }
+
+  const datastorePath =
+    path.join(
+      MOSAIC_DIR,
+      "datastore.properties"
+    );
+
+  if (!fs.existsSync(datastorePath)) {
+
+    fs.writeFileSync(
+      datastorePath,
+`SPI=org.geotools.data.h2.H2DataStoreFactory
+database=mosaic
+dbtype=h2
+`
+    );
+
+    console.log(
+      "Created datastore.properties"
     );
   }
 }
 
-async function deleteGeoServerLayer(layerName) {
-
-  const workspace = "weather";
-
-  const url =
-    `http://geoserver:8080/geoserver/rest/workspaces/` +
-    `${workspace}/coveragestores/${layerName}` +
-    `?recurse=true`;
-
-  try {
-
-    await axios.delete(url, {
-      auth: {
-        username: "admin",
-        password: "geoserver"
-      }
-    });
-
-    console.log(`Deleted GeoServer layer: ${layerName}`);
-
-  } catch (err) {
-
-    console.error(
-      `Failed deleting layer ${layerName}:`,
-      err.response?.data || err.message
-    );
-
-  }
-}
-
-// ====== DOWNLOAD ======
+// ===== DOWNLOAD =====
 
 async function downloadFile(url, filePath) {
+
   if (fs.existsSync(filePath)) {
-    console.log("Skip existing:", filePath);
-    return filePath;
+
+    console.log(
+      "Skip existing:",
+      filePath
+    );
+
+    return;
   }
 
   const response = await axios({
@@ -184,83 +171,115 @@ async function downloadFile(url, filePath) {
     responseType: "stream"
   });
 
-  const writer = fs.createWriteStream(filePath);
+  const writer =
+    fs.createWriteStream(filePath);
+
   response.data.pipe(writer);
 
   return new Promise((resolve, reject) => {
-    writer.on("finish", () => resolve(filePath));
+
+    writer.on("finish", resolve);
+
     writer.on("error", reject);
+
   });
 }
 
-// ====== CONVERT ======
+// ===== CONVERT =====
 
-function convertToTif(gribPath, tifPath) {
+function convertToTif(
+  gribPath,
+  tifPath
+) {
+
   return new Promise((resolve, reject) => {
+
     if (fs.existsSync(tifPath)) {
-      console.log("Skip existing tif:", tifPath);
-      return resolve(tifPath);
+
+      console.log(
+        "Skip existing tif:",
+        tifPath
+      );
+
+      return resolve();
     }
 
-    const cmd = `gdal_translate -of GTiff -ot Float32 -a_srs EPSG:4326 "${gribPath}" "${tifPath}"`;
+    const cmd =
+      `gdal_translate ` +
+      `-of GTiff ` +
+      `-ot Float32 ` +
+      `-a_srs EPSG:4326 ` +
+      `"${gribPath}" ` +
+      `"${tifPath}"`;
 
     exec(cmd, (err, stdout, stderr) => {
+
       if (err) {
-        console.error("GDAL error:", stderr);
+
+        console.error(
+          "GDAL error:",
+          stderr
+        );
+
         return reject(err);
       }
-      resolve(tifPath);
+
+      resolve();
     });
   });
 }
 
-// ====== PUBLISH ======
+// ===== GEOSERVER =====
 
-async function storeExists(workspace, layerName) {
-
-  const url =
-    `http://geoserver:8080/geoserver/rest/workspaces/` +
-    `${workspace}/coveragestores/${layerName}.json`;
+async function mosaicExists() {
 
   try {
 
-    await axios.get(url, {
-      auth: {
-        username: "admin",
-        password: "geoserver"
+    await axios.get(
+      "http://geoserver:8080/geoserver/rest/workspaces/weather/coveragestores/temperature_mosaic.json",
+      {
+        auth: {
+          username: "admin",
+          password: "geoserver"
+        }
       }
-    });
+    );
 
     return true;
 
   } catch (err) {
 
-    if (err.response?.status === 404) {
-      return false;
-    }
-
-    throw err;
+    return false;
   }
 }
 
-async function setLayerStyle(layerName) {
+async function publishMosaic() {
+
+  const exists =
+    await mosaicExists();
+
+  if (exists) {
+
+    console.log(
+      "Mosaic already exists"
+    );
+
+    return;
+  }
+
+  console.log(
+    "Publishing ImageMosaic..."
+  );
 
   const url =
-    `http://geoserver:8080/geoserver/rest/layers/` +
-    `weather:${layerName}.json`;
+    "http://geoserver:8080/geoserver/rest/workspaces/weather/coveragestores/temperature_mosaic/external.imagemosaic";
 
   await axios.put(
     url,
-    {
-      layer: {
-        defaultStyle: {
-          name: "temperature_style"
-        }
-      }
-    },
+    "file:///data/mosaic/temperature",
     {
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "text/plain"
       },
       auth: {
         username: "admin",
@@ -268,77 +287,53 @@ async function setLayerStyle(layerName) {
       }
     }
   );
+
+  console.log(
+    "Published ImageMosaic"
+  );
 }
 
-async function publishGeoTiff(layerName, tifPath) {
-
-  const workspace = "weather";
+async function reloadGeoServer() {
 
   try {
 
-    const exists = await storeExists(
-      workspace,
-      layerName
-    );
-
-    if (exists) {
-
-      console.log(
-        `Skip existing store: ${layerName}`
-      );
-
-      return;
-    }
-
-    const url =
-      `http://geoserver:8080/geoserver/rest/workspaces/` +
-      `${workspace}/coveragestores/${layerName}/file.geotiff`;
-
-    const fileBuffer = fs.readFileSync(tifPath);
-
-    await axios.put(
-      url,
-      fileBuffer,
+    await axios.post(
+      "http://geoserver:8080/geoserver/rest/reload",
+      {},
       {
-        headers: {
-          "Content-Type": "image/tiff"
-        },
         auth: {
           username: "admin",
           password: "geoserver"
-        },
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity
+        }
       }
     );
 
-    console.log(`Published ${layerName}`);
+    console.log(
+      "GeoServer reloaded"
+    );
 
   } catch (err) {
 
     console.error(
-      `Publish failed ${layerName}:`,
-      err.response?.data || err.message
+      "Reload failed:",
+      err.message
     );
   }
 }
 
-// ====== MAIN ======
+// ===== MAIN =====
 
 async function run() {
-  const date = getStableDate();
-  const cycle = getCycle();
 
-  console.log(`\n=== RUN ${date}_${cycle} ===`);
+  ensureDirs();
 
-  const gribDir = path.join(DATA_DIR, "grib");
-  const tifDir = path.join(DATA_DIR, "geotiff");
+  ensureMosaicFiles();
 
-  // tạo đúng cấu trúc
-  fs.mkdirSync(gribDir, { recursive: true });
-  fs.mkdirSync(tifDir, { recursive: true });
+  const date =
+    getStableDate();
 
-  
+  const cycle =
+    getCycle();
 
   const bbox = {
     leftlon: 100.1,
@@ -347,19 +342,40 @@ async function run() {
     bottomlat: 6.4
   };
 
-  for (let h = 0; h <= MAX_FORECAST_HOUR; h += FORECAST_STEP) {
-    const runTime = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${cycle}:00:00Z`);
+  for (
+    let h = 0;
+    h <= MAX_FORECAST_HOUR;
+    h += FORECAST_STEP
+  ) {
 
-    const validTime = new Date(runTime.getTime() + h * 3600 * 1000);
+    const runTime =
+      new Date(
+        `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${cycle}:00:00Z`
+      );
 
-    const fStr = String(h).padStart(3, "0");
+    const validTime =
+      new Date(
+        runTime.getTime() +
+        h * 3600 * 1000
+      );
 
-    // const fileName = `gfs_${date}_${cycle}_f${fStr}`;
-    const timeStr = formatCompact(validTime);
-    const fileName = `tmp_${timeStr}`;
+    const timeStr =
+      formatGeoServerTime(validTime);
 
-    const gribPath = path.join(gribDir, `${fileName}.grib2`);
-    const tifPath = path.join(tifDir, `${fileName}.tif`);
+    const gribPath =
+      path.join(
+        GRIB_DIR,
+        `${timeStr}.grib2`
+      );
+
+    const tifPath =
+      path.join(
+        MOSAIC_DIR,
+        `${timeStr}.tif`
+      );
+
+    const fStr =
+      String(h).padStart(3, "0");
 
     const url =
       `${BASE_URL}?file=gfs.t${cycle}z.pgrb2.0p25.f${fStr}` +
@@ -373,30 +389,63 @@ async function run() {
       `&dir=%2Fgfs.${date}%2F${cycle}%2Fatmos`;
 
     try {
-      console.log(`Downloading f${fStr}...`);
-      await downloadFile(url, gribPath);
 
-      console.log(`Converting f${fStr}...`);
-      await convertToTif(gribPath, tifPath);
+      console.log(
+        `Downloading f${fStr}`
+      );
 
-      console.log(`Publishing f${fStr}...`);
-      await publishGeoTiff(
-        `gfs_${timeStr}`,
+      await downloadFile(
+        url,
+        gribPath
+      );
+
+      console.log(
+        `Converting f${fStr}`
+      );
+
+      await convertToTif(
+        gribPath,
         tifPath
       );
 
-      console.log(`Styling f${fStr}...`);
-      await setLayerStyle(`gfs_${timeStr}`);
-
-      console.log(`Done f${fStr}`);
     } catch (err) {
-      console.error(`Error f${fStr}:`, err.message);
+
+      console.error(
+        `Error f${fStr}:`,
+        err.message
+      );
     }
   }
 
-  await cleanupOldData();
+  // try {
 
-  console.log("=== DONE RUN ===\n");
+  //   await publishMosaic();
+
+  // } catch (err) {
+
+  //   console.error(
+  //     "Publish mosaic failed:"
+  //   );
+
+  //   if (err.response) {
+
+  //     console.error(
+  //       err.response.status
+  //     );
+
+  //     console.error(
+  //       err.response.data
+  //     );
+
+  //   } else {
+
+  //     console.error(err.message);
+  //   }
+  // }
+
+  await reloadGeoServer();
+
+  console.log("DONE");
 }
 
 module.exports = { run };

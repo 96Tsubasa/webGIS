@@ -5,7 +5,12 @@ const path = require("path");
 const router = express.Router();
 
 const DATA_DIR = process.env.DATA_DIR || "/data";
-const TIFF_DIR = path.join(DATA_DIR, "geotiff");
+const TIFF_DIR =
+  path.join(
+    DATA_DIR,
+    "mosaic",
+    "temperature"
+  );
 
 router.get("/", (req, res) => {
   try {
@@ -21,8 +26,7 @@ router.get("/", (req, res) => {
 
         return {
           file,
-          timestamp: match[1],
-          layer: `gfs_${match[1]}`
+          timestamp: match[1]
         };
       })
       .filter(Boolean)

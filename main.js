@@ -43,34 +43,43 @@ L.control.layers({
 
 const marker = L.marker([21.0285, 105.8542]).addTo(map).bindPopup("<b>Hà Nội</b><br/>Thủ đô Việt Nam").openPopup();
 
-function renderWeatherLayer(layerName) {
+function renderWeatherLayer(timestamp) {
 
   if (weatherLayer) {
     map.removeLayer(weatherLayer);
   }
 
+  const isoTime =
+  `${timestamp.slice(0,4)}-` +
+  `${timestamp.slice(4,6)}-` +
+  `${timestamp.slice(6,8)}T` +
+  `${timestamp.slice(9,11)}:` +
+  `${timestamp.slice(11,13)}:` +
+  `${timestamp.slice(13,15)}.000Z`;
+
   weatherLayer = L.tileLayer.wms(
     "http://localhost:8080/geoserver/weather/wms",
     {
-      layers: `weather:${layerName}`,
+      layers: "weather:temperature",
       format: "image/png",
       transparent: true,
       opacity: 0.55,
-      zIndex: 1000
+      zIndex: 1000,
+      time: isoTime
     }
   );
 
   weatherLayer.addTo(map);
 
-  // update UI
   slider.value = currentIndex;
 
   label.innerText =
-    formatTimestamp(
-      timestamps[currentIndex].timestamp
-    );
+    formatTimestamp(timestamp);
 
-  console.log("Showing:", layerName);
+  console.log(
+    "Showing time:",
+    isoTime
+  );
 }
 
 // Load timestamps from backend
@@ -89,7 +98,7 @@ fetch("http://localhost:3000/api/timestamps")
     currentIndex = 0;
 
     renderWeatherLayer(
-      timestamps[currentIndex].layer
+      timestamps[currentIndex].timestamp
     );
   })
   .catch(err => console.error(err));
@@ -99,7 +108,7 @@ slider.addEventListener("input", () => {
   currentIndex = parseInt(slider.value);
 
   renderWeatherLayer(
-    timestamps[currentIndex].layer
+    timestamps[currentIndex].timestamp
   );
 
 });
@@ -135,7 +144,7 @@ function nextFrame() {
   }
 
   renderWeatherLayer(
-    timestamps[currentIndex].layer
+    timestamps[currentIndex].timestamp
   );
 }
 
