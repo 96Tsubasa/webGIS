@@ -12,13 +12,37 @@ const DATA_DIR =
 const MAX_FORECAST_HOUR = 72;
 const FORECAST_STEP = 1;
 
-// ===== DIRECTORIES =====
+// ===== WEATHER VARIABLES =====
 
-const GRIB_DIR =
-  path.join(DATA_DIR, "grib", "temperature");
+const VARIABLES = [
 
-const MOSAIC_DIR =
-  path.join(DATA_DIR, "mosaic", "temperature");
+  {
+    key: "temperature",
+
+    levelQuery:
+      "&lev_2_m_above_ground=on",
+
+    variableQuery:
+      "&var_TMP=on",
+
+    gdalBand: null
+  },
+
+  {
+    key: "precipitation",
+
+    levelQuery:
+      "&lev_surface=on",
+
+    variableQuery:
+      "&var_APCP=on",
+
+    gdalBand: 1,
+
+    startHour: 1
+  }
+
+];
 
 // ===== TIME =====
 
@@ -32,8 +56,10 @@ function getStableDate() {
 
   return (
     now.getUTCFullYear() +
-    String(now.getUTCMonth() + 1).padStart(2, "0") +
-    String(now.getUTCDate()).padStart(2, "0")
+    String(now.getUTCMonth() + 1)
+      .padStart(2, "0") +
+    String(now.getUTCDate())
+      .padStart(2, "0")
   );
 }
 
@@ -49,8 +75,6 @@ function getCycle() {
   return "00";
 }
 
-// IMPORTANT:
-// GeoServer parses this natively
 function formatGeoServerTime(date) {
 
   const y = date.getUTCFullYear();
@@ -70,24 +94,47 @@ function formatGeoServerTime(date) {
   return `${y}${m}${d}T${h}0000`;
 }
 
-// ===== FILE HELPERS =====
+// ===== DIRECTORY HELPERS =====
 
-function ensureDirs() {
+function getGribDir(variableKey) {
 
-  fs.mkdirSync(GRIB_DIR, {
-    recursive: true
-  });
-
-  fs.mkdirSync(MOSAIC_DIR, {
-    recursive: true
-  });
+  return path.join(
+    DATA_DIR,
+    "grib",
+    variableKey
+  );
 }
 
-function ensureMosaicFiles() {
+function getMosaicDir(variableKey) {
+
+  return path.join(
+    DATA_DIR,
+    "mosaic",
+    variableKey
+  );
+}
+
+function ensureDirs(variableKey) {
+
+  fs.mkdirSync(
+    getGribDir(variableKey),
+    { recursive: true }
+  );
+
+  fs.mkdirSync(
+    getMosaicDir(variableKey),
+    { recursive: true }
+  );
+}
+
+function ensureMosaicFiles(variableKey) {
+
+  const mosaicDir =
+    getMosaicDir(variableKey);
 
   const indexerPath =
     path.join(
-      MOSAIC_DIR,
+      mosaicDir,
       "indexer.properties"
     );
 
@@ -105,13 +152,13 @@ CanBeEmpty=true
     );
 
     console.log(
-      "Created indexer.properties"
+      `[${variableKey}] Created indexer.properties`
     );
   }
 
   const timeregexPath =
     path.join(
-      MOSAIC_DIR,
+      mosaicDir,
       "timeregex.properties"
     );
 
@@ -125,13 +172,13 @@ format=yyyyMMdd'T'HHmmss
     );
 
     console.log(
-      "Created timeregex.properties"
+      `[${variableKey}] Created timeregex.properties`
     );
   }
 
   const datastorePath =
     path.join(
-      MOSAIC_DIR,
+      mosaicDir,
       "datastore.properties"
     );
 
@@ -146,14 +193,17 @@ dbtype=h2
     );
 
     console.log(
-      "Created datastore.properties"
+      `[${variableKey}] Created datastore.properties`
     );
   }
 }
 
 // ===== DOWNLOAD =====
 
-async function downloadFile(url, filePath) {
+async function downloadFile(
+  url,
+  filePath
+) {
 
   if (fs.existsSync(filePath)) {
 
@@ -185,11 +235,12 @@ async function downloadFile(url, filePath) {
   });
 }
 
-// ===== CONVERT =====
+// ===== GDAL =====
 
 function convertToTif(
   gribPath,
-  tifPath
+  tifPath,
+  gdalBand = null
 ) {
 
   return new Promise((resolve, reject) => {
@@ -204,11 +255,17 @@ function convertToTif(
       return resolve();
     }
 
-    const cmd =
+    let cmd =
       `gdal_translate ` +
       `-of GTiff ` +
       `-ot Float32 ` +
-      `-a_srs EPSG:4326 ` +
+      `-a_srs EPSG:4326 `;
+
+    if (gdalBand !== null) {
+      cmd += `-b ${gdalBand} `;
+    }
+
+    cmd +=
       `"${gribPath}" ` +
       `"${tifPath}"`;
 
@@ -226,72 +283,12 @@ function convertToTif(
 
       resolve();
     });
+
   });
+
 }
 
 // ===== GEOSERVER =====
-
-async function mosaicExists() {
-
-  try {
-
-    await axios.get(
-      "http://geoserver:8080/geoserver/rest/workspaces/weather/coveragestores/temperature_mosaic.json",
-      {
-        auth: {
-          username: "admin",
-          password: "geoserver"
-        }
-      }
-    );
-
-    return true;
-
-  } catch (err) {
-
-    return false;
-  }
-}
-
-async function publishMosaic() {
-
-  const exists =
-    await mosaicExists();
-
-  if (exists) {
-
-    console.log(
-      "Mosaic already exists"
-    );
-
-    return;
-  }
-
-  console.log(
-    "Publishing ImageMosaic..."
-  );
-
-  const url =
-    "http://geoserver:8080/geoserver/rest/workspaces/weather/coveragestores/temperature_mosaic/external.imagemosaic";
-
-  await axios.put(
-    url,
-    "file:///data/mosaic/temperature",
-    {
-      headers: {
-        "Content-Type": "text/plain"
-      },
-      auth: {
-        username: "admin",
-        password: "geoserver"
-      }
-    }
-  );
-
-  console.log(
-    "Published ImageMosaic"
-  );
-}
 
 async function reloadGeoServer() {
 
@@ -319,31 +316,24 @@ async function reloadGeoServer() {
       err.message
     );
   }
+
 }
 
-// ===== MAIN =====
+// ===== VARIABLE PIPELINE =====
 
-async function run() {
+async function processVariable(
+  variable,
+  date,
+  cycle,
+  bbox
+) {
 
-  ensureDirs();
+  ensureDirs(variable.key);
 
-  ensureMosaicFiles();
-
-  const date =
-    getStableDate();
-
-  const cycle =
-    getCycle();
-
-  const bbox = {
-    leftlon: 100.1,
-    rightlon: 111.8,
-    toplat: 25.6,
-    bottomlat: 6.4
-  };
+  ensureMosaicFiles(variable.key);
 
   for (
-    let h = 0;
+    let h = (variable.startHour || 0);
     h <= MAX_FORECAST_HOUR;
     h += FORECAST_STEP
   ) {
@@ -364,13 +354,13 @@ async function run() {
 
     const gribPath =
       path.join(
-        GRIB_DIR,
+        getGribDir(variable.key),
         `${timeStr}.grib2`
       );
 
     const tifPath =
       path.join(
-        MOSAIC_DIR,
+        getMosaicDir(variable.key),
         `${timeStr}.tif`
       );
 
@@ -379,8 +369,8 @@ async function run() {
 
     const url =
       `${BASE_URL}?file=gfs.t${cycle}z.pgrb2.0p25.f${fStr}` +
-      `&lev_2_m_above_ground=on` +
-      `&var_TMP=on` +
+      `${variable.levelQuery}` +
+      `${variable.variableQuery}` +
       `&subregion=` +
       `&leftlon=${bbox.leftlon}` +
       `&rightlon=${bbox.rightlon}` +
@@ -391,7 +381,7 @@ async function run() {
     try {
 
       console.log(
-        `Downloading f${fStr}`
+        `[${variable.key}] Downloading f${fStr}`
       );
 
       await downloadFile(
@@ -400,52 +390,64 @@ async function run() {
       );
 
       console.log(
-        `Converting f${fStr}`
+        `[${variable.key}] Converting f${fStr}`
       );
 
       await convertToTif(
         gribPath,
-        tifPath
+        tifPath,
+        variable.gdalBand
       );
 
     } catch (err) {
 
       console.error(
-        `Error f${fStr}:`,
+        `[${variable.key}] Error f${fStr}:`,
         err.message
       );
+
     }
+
   }
 
-  // try {
+}
 
-  //   await publishMosaic();
+// ===== MAIN =====
 
-  // } catch (err) {
+async function run() {
 
-  //   console.error(
-  //     "Publish mosaic failed:"
-  //   );
+  const date =
+    getStableDate();
 
-  //   if (err.response) {
+  const cycle =
+    getCycle();
 
-  //     console.error(
-  //       err.response.status
-  //     );
+  const bbox = {
+    leftlon: 100.1,
+    rightlon: 111.8,
+    toplat: 25.6,
+    bottomlat: 6.4
+  };
 
-  //     console.error(
-  //       err.response.data
-  //     );
+  for (const variable of VARIABLES) {
 
-  //   } else {
+    console.log(
+      `========== ${variable.key.toUpperCase()} ==========`
+    );
 
-  //     console.error(err.message);
-  //   }
-  // }
+    await processVariable(
+      variable,
+      date,
+      cycle,
+      bbox
+    );
+
+  }
 
   await reloadGeoServer();
 
   console.log("DONE");
+
 }
 
 module.exports = { run };

@@ -4,10 +4,38 @@ let timestamps = [];
 let currentIndex = 0;
 let isPlaying = false;
 let playbackInterval = null;
+let currentVariable = "temperature"; 
+
+const VARIABLE_CONFIG = {
+
+  temperature: {
+    layer: "weather:temperature",
+    opacity: 0.55
+  },
+
+  precipitation: {
+    layer: "weather:precipitation",
+    opacity: 0.72
+  }
+
+};
 
 const slider = document.getElementById("time-slider");
 const label = document.getElementById("time-label");
 const playBtn = document.getElementById("play-btn");
+const variableSelect =document.getElementById("weather-variable");
+
+variableSelect.addEventListener(
+  "change",
+  async (e) => {
+
+    currentVariable =
+      e.target.value;
+
+    await loadTimestamps();
+
+  }
+);
 
 // Helper functions
 function formatTimestamp(ts) {
@@ -60,10 +88,14 @@ function renderWeatherLayer(timestamp) {
   weatherLayer = L.tileLayer.wms(
     "http://localhost:8080/geoserver/weather/wms",
     {
-      layers: "weather:temperature",
+      layers: VARIABLE_CONFIG[ 
+        currentVariable 
+      ].layer,
       format: "image/png",
       transparent: true,
-      opacity: 0.55,
+      opacity: VARIABLE_CONFIG[
+        currentVariable
+      ].opacity,
       zIndex: 1000,
       time: isoTime
     }
@@ -83,25 +115,46 @@ function renderWeatherLayer(timestamp) {
 }
 
 // Load timestamps from backend
-fetch("http://localhost:3000/api/timestamps")
-  .then(res => res.json())
-  .then(data => {
+async function loadTimestamps() {
+
+  try {
+
+    const res = await fetch(
+      `http://localhost:3000/api/timestamps?variable=${currentVariable}`
+    );
+
+    const data = await res.json();
 
     timestamps = data;
-    slider.max = timestamps.length - 1;
+
+    slider.max =
+      timestamps.length - 1;
 
     if (timestamps.length === 0) {
-      console.log("No weather layers");
+
+      console.log(
+        "No weather layers"
+      );
+
       return;
     }
 
     currentIndex = 0;
 
     renderWeatherLayer(
-      timestamps[currentIndex].timestamp
+      timestamps[currentIndex]
+        .timestamp
     );
-  })
-  .catch(err => console.error(err));
+
+  } catch (err) {
+
+    console.error(err);
+
+  }
+
+}
+
+loadTimestamps();
 
 slider.addEventListener("input", () => {
 
