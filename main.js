@@ -140,7 +140,33 @@ async function loadTimestamps() {
       return;
     }
 
-    currentIndex = 0;
+    const now = new Date();
+
+    let nearestIndex = 0;
+    let smallestDiff = Infinity;
+
+    timestamps.forEach((t, index) => {
+
+      const ts = t.timestamp;
+
+      const date =
+        new Date(
+          `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}T${ts.slice(9,11)}:${ts.slice(11,13)}:${ts.slice(13,15)}Z`
+        );
+
+      const diff =
+        Math.abs(date - now);
+
+      if (diff < smallestDiff) {
+
+        smallestDiff = diff;
+        nearestIndex = index;
+
+      }
+
+    });
+
+    currentIndex = nearestIndex;
 
     renderWeatherLayer(
       timestamps[currentIndex]
