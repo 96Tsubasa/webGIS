@@ -50,6 +50,17 @@ function formatTimestamp(ts) {
   return `${hour}:00 ${day}/${month}/${year}`;
 }
 
+function getIsoTime(timestamp) {
+  const isoTime =
+  `${timestamp.slice(0,4)}-` +
+  `${timestamp.slice(4,6)}-` +
+  `${timestamp.slice(6,8)}T` +
+  `${timestamp.slice(9,11)}:` +
+  `${timestamp.slice(11,13)}:` +
+  `${timestamp.slice(13,15)}.000Z`;
+  return isoTime;
+}
+
 // Base layers
 const osm = L.tileLayer(
   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -78,13 +89,7 @@ function renderWeatherLayer(timestamp) {
     map.removeLayer(weatherLayer);
   }
 
-  const isoTime =
-  `${timestamp.slice(0,4)}-` +
-  `${timestamp.slice(4,6)}-` +
-  `${timestamp.slice(6,8)}T` +
-  `${timestamp.slice(9,11)}:` +
-  `${timestamp.slice(11,13)}:` +
-  `${timestamp.slice(13,15)}.000Z`;
+  const isoTime = getIsoTime(timestamp);
 
   weatherLayer = L.tileLayer.wms(
     "http://localhost:8080/geoserver/weather/wms",
@@ -311,3 +316,65 @@ function updateLegend() {
     "&LAYER=" + layerName;
 
 }
+
+// Popup Query
+map.on("click", async (e) => {
+    const bounds = map.getBounds();
+
+    const bbox = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+    ].join(",");
+
+    const size = map.getSize();
+
+    const point = map.latLngToContainerPoint(e.latlng);
+
+    const url =
+        `http://localhost:3000/api/feature-info?` +
+        `SERVICE=WMS&` +
+        `VERSION=1.1.1&` +
+        `REQUEST=GetFeatureInfo&` +
+        `LAYERS=weather:temperature&` +
+        `QUERY_LAYERS=weather:temperature&` +
+        `INFO_FORMAT=text/plain&` +
+        `FEATURE_COUNT=1&` +
+        `FORMAT=image/png&` +
+        `SRS=EPSG:4326&` +
+        `WIDTH=${size.x}&` +
+        `HEIGHT=${size.y}&` +
+        `BBOX=${bbox}&` +
+        `X=${Math.round(point.x)}&` +
+        `Y=${Math.round(point.y)}` +
+        `&TIME=${getIsoTime(timestamps[currentIndex].timestamp)}`;
+
+    try {
+        const response = await fetch(url);
+        const text = await response.text();
+
+        console.log(text);
+
+        const match = text.match(/GRAY_INDEX = ([\d.-]+)/);
+
+        let temperature = "No data";
+
+        if (match && match[1]) {
+            temperature = parseFloat(match[1]).toFixed(2);
+        }
+
+        L.popup()
+            .setLatLng(e.latlng)
+            .setContent(`
+                <b>Weather Info</b><br/>
+                Lat: ${e.latlng.lat.toFixed(4)}<br/>
+                Lon: ${e.latlng.lng.toFixed(4)}<br/>
+                Temperature: ${temperature} °C
+            `)
+            .openOn(map);
+
+    } catch (err) {
+        console.error(err);
+    }
+});

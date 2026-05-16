@@ -46,33 +46,124 @@ const VARIABLES = [
 
 // ===== TIME =====
 
-function getStableDate() {
+async function findLatestCycle() {
 
   const now = new Date();
 
-  now.setUTCDate(
-    now.getUTCDate() - 1
-  );
+  const cycles = ["18", "12", "06", "00"];
 
-  return (
-    now.getUTCFullYear() +
-    String(now.getUTCMonth() + 1)
-      .padStart(2, "0") +
-    String(now.getUTCDate())
-      .padStart(2, "0")
+  for (let dayOffset = 0; dayOffset <= 2; dayOffset++) {
+
+    const date = new Date(now);
+
+    date.setUTCDate(
+      date.getUTCDate() - dayOffset
+    );
+
+    const ymd =
+      date.getUTCFullYear() +
+      String(date.getUTCMonth() + 1)
+        .padStart(2, "0") +
+      String(date.getUTCDate())
+        .padStart(2, "0");
+
+    for (const cycle of cycles) {
+
+      const testUrl =
+        `${BASE_URL}` +
+        `?file=gfs.t${cycle}z.pgrb2.0p25.f072` +
+        `&lev_2_m_above_ground=on` +
+        `&var_TMP=on` +
+        `&subregion=` +
+        `&leftlon=100` +
+        `&rightlon=101` +
+        `&toplat=21` +
+        `&bottomlat=20` +
+        `&dir=%2Fgfs.${ymd}%2F${cycle}%2Fatmos`;
+
+      try {
+
+        const res = await axios.get(testUrl, {
+          timeout: 10000,
+          responseType: "stream"
+        });
+
+        if (res.status === 200) {
+
+          const latestCycle = {
+            date: ymd,
+            cycle,
+            updatedAt: new Date().toISOString()
+          };
+
+          return latestCycle;
+
+        }
+
+      } catch (err) {
+
+      }
+
+    }
+
+  }
+
+  throw new Error(
+    "No available GFS cycle found"
   );
 }
 
-function getCycle() {
+function saveCycle(cycleData) {
 
-  const hour =
-    new Date().getUTCHours();
+  const statePath =
+    path.join(
+      DATA_DIR,
+      "latest_cycle.json"
+    );
 
-  if (hour >= 18) return "18";
-  if (hour >= 12) return "12";
-  if (hour >= 6) return "06";
+  fs.writeFileSync(
+    statePath,
+    JSON.stringify(
+      cycleData,
+      null,
+      2
+    )
+  );
 
-  return "00";
+}
+
+function getSavedCycle() {
+
+  const statePath =
+    path.join(
+      DATA_DIR,
+      "latest_cycle.json"
+    );
+
+  if (!fs.existsSync(statePath)) {
+    return null;
+  }
+
+  try {
+
+    return JSON.parse(
+      fs.readFileSync(
+        statePath,
+        "utf8"
+      )
+    );
+
+  } catch (err) {
+
+    console.error(
+      "Failed to read latest_cycle.json:",
+      err.message
+    );
+
+    return null;
+
+  }
+
 }
 
 function formatGeoServerTime(date) {
@@ -198,6 +289,66 @@ dbtype=h2
   }
 }
 
+function cleanupOldFiles(variableKey) {
+
+  const dirs = [
+    getGribDir(variableKey),
+    getMosaicDir(variableKey)
+  ];
+
+  const now = new Date();
+
+  const cutoff =
+    now.getTime() -
+    3 * 24 * 3600 * 1000;
+
+  for (const dir of dirs) {
+
+    const files =
+      fs.readdirSync(dir);
+
+    for (const file of files) {
+
+      const match =
+        file.match(
+          /^(\d{8}T\d{6})/
+        );
+
+      if (!match) continue;
+
+      const ts = match[1];
+
+      const fileDate = new Date(
+        ts.slice(0,4) + "-" +
+        ts.slice(4,6) + "-" +
+        ts.slice(6,8) + "T" +
+        ts.slice(9,11) + ":00:00Z"
+      );
+
+      if (
+        fileDate.getTime() < cutoff
+      ) {
+
+        const fullPath =
+          path.join(dir, file);
+
+        fs.rmSync(fullPath, {
+          force: true
+        });
+
+        console.log(
+          "Deleted old file:",
+          fullPath
+        );
+
+      }
+
+    }
+
+  }
+
+}
+
 // ===== DOWNLOAD =====
 
 async function downloadFile(
@@ -205,15 +356,7 @@ async function downloadFile(
   filePath
 ) {
 
-  if (fs.existsSync(filePath)) {
-
-    console.log(
-      "Skip existing:",
-      filePath
-    );
-
-    return;
-  }
+  fs.rmSync(filePath, { force: true });
 
   const response = await axios({
     method: "GET",
@@ -244,16 +387,9 @@ function convertToTif(
 ) {
 
   return new Promise((resolve, reject) => {
-
-    if (fs.existsSync(tifPath)) {
-
-      console.log(
-        "Skip existing tif:",
-        tifPath
-      );
-
-      return resolve();
-    }
+    fs.rmSync(tifPath, {
+      force: true
+    });
 
     let cmd =
       `gdal_translate ` +
@@ -416,11 +552,35 @@ async function processVariable(
 
 async function run() {
 
+  const latestCycle =
+    await findLatestCycle();
+
+  const savedCycle =
+    getSavedCycle();
+
+  if (
+    savedCycle &&
+    savedCycle.date === latestCycle.date &&
+    savedCycle.cycle === latestCycle.cycle
+  ) {
+
+    console.log(
+      "No new GFS cycle. Skip pipeline."
+    );
+
+    return;
+
+  }
+
+  console.log(
+    `New cycle detected: ${latestCycle.date} ${latestCycle.cycle}z`
+  );
+
   const date =
-    getStableDate();
+    latestCycle.date;
 
   const cycle =
-    getCycle();
+    latestCycle.cycle;
 
   const bbox = {
     leftlon: 100.1,
@@ -442,9 +602,13 @@ async function run() {
       bbox
     );
 
+    cleanupOldFiles(variable.key);
+
   }
 
   await reloadGeoServer();
+
+  saveCycle(latestCycle);
 
   console.log("DONE");
 
