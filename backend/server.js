@@ -4,6 +4,7 @@ const cors = require("cors");
 const cron = require("node-cron");
 const { run } = require("./ingestion/gfsPipeline");
 const timestampsRoute = require("./routes/timestamps");
+const featureInfoRoute = require("./routes/featureInfo");
 
 const app = express();
 app.use(cors());
@@ -35,6 +36,7 @@ cron.schedule("15 */6 * * *", async () => {
 
 // Mount route
 app.use("/api/timestamps", timestampsRoute);
+app.use("/api/feature-info", featureInfoRoute);
 
 // Dùng API của moitruongthudo để lấy data về AQI
 app.get("/api/aqi", async (req, res) => {
