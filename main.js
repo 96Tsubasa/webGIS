@@ -5,6 +5,7 @@ let currentIndex = 0;
 let isPlaying = false;
 let playbackInterval = null;
 let currentVariable = "temperature"; 
+let selectedPoint = null;
 
 const VARIABLE_CONFIG = {
 
@@ -81,7 +82,7 @@ L.control.layers({
   "Satellite": satellite
 }).addTo(map);
 
-const marker = L.marker([21.0285, 105.8542]).addTo(map).bindPopup("<b>Hà Nội</b><br/>Thủ đô Việt Nam").openPopup();
+// const marker = L.marker([21.0285, 105.8542]).addTo(map).bindPopup("<b>Hà Nội</b><br/>Thủ đô Việt Nam").openPopup();
 
 function renderWeatherLayer(timestamp) {
 
@@ -113,6 +114,10 @@ function renderWeatherLayer(timestamp) {
 
   label.innerText =
     formatTimestamp(timestamp);
+
+  if (selectedPoint) {
+    updateInfoPanel();
+  }
 
   console.log(
     "Showing time:",
@@ -251,47 +256,47 @@ function stopPlayback() {
 }
 
 // AQI Data
-fetch("http://localhost:3000/api/aqi")
-  .then(res => res.json())
-  .then(data => {
+// fetch("http://localhost:3000/api/aqi")
+//   .then(res => res.json())
+//   .then(data => {
 
-    L.geoJSON({
-      type: "FeatureCollection",
-      features: data.map(item => ({
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: [
-            item.longtitude,
-            item.latitude
-          ]
-        },
-        properties: item
-      }))
-    }, {
-      pointToLayer: (feature, latlng) => {
-        return L.circleMarker(latlng, {
-          radius: 8,
-          color: feature.properties.color,
-          fillOpacity: 0.8
-        });
-      },
+//     L.geoJSON({
+//       type: "FeatureCollection",
+//       features: data.map(item => ({
+//         type: "Feature",
+//         geometry: {
+//           type: "Point",
+//           coordinates: [
+//             item.longtitude,
+//             item.latitude
+//           ]
+//         },
+//         properties: item
+//       }))
+//     }, {
+//       pointToLayer: (feature, latlng) => {
+//         return L.circleMarker(latlng, {
+//           radius: 8,
+//           color: feature.properties.color,
+//           fillOpacity: 0.8
+//         });
+//       },
 
-      onEachFeature: (feature, layer) => {
-        const p = feature.properties;
+//       onEachFeature: (feature, layer) => {
+//         const p = feature.properties;
 
-        layer.bindPopup(`
-          <b>${p.name}</b><br>
-          AQI: ${p.aqi} (${p.aqiText})<br>
-          Temp: ${p.temp}°C<br>
-          Humidity: ${p.humid}%
-        `);
-      }
+//         layer.bindPopup(`
+//           <b>${p.name}</b><br>
+//           AQI: ${p.aqi} (${p.aqiText})<br>
+//           Temp: ${p.temp}°C<br>
+//           Humidity: ${p.humid}%
+//         `);
+//       }
 
-    }).addTo(map);
+//     }).addTo(map);
 
-  })
-  .catch(err => console.error(err));
+//   })
+//   .catch(err => console.error(err));
 
 // Update Legend
 function updateLegend() {
@@ -317,8 +322,9 @@ function updateLegend() {
 
 }
 
-// Popup Query
-map.on("click", async (e) => {
+// Helper Query Layer
+async function queryLayer(layerName, latlng) {
+
     const bounds = map.getBounds();
 
     const bbox = [
@@ -330,15 +336,16 @@ map.on("click", async (e) => {
 
     const size = map.getSize();
 
-    const point = map.latLngToContainerPoint(e.latlng);
+    const point =
+        map.latLngToContainerPoint(latlng);
 
     const url =
         `http://localhost:3000/api/feature-info?` +
         `SERVICE=WMS&` +
         `VERSION=1.1.1&` +
         `REQUEST=GetFeatureInfo&` +
-        `LAYERS=weather:temperature&` +
-        `QUERY_LAYERS=weather:temperature&` +
+        `LAYERS=${layerName}&` +
+        `QUERY_LAYERS=${layerName}&` +
         `INFO_FORMAT=text/plain&` +
         `FEATURE_COUNT=1&` +
         `FORMAT=image/png&` +
@@ -348,33 +355,76 @@ map.on("click", async (e) => {
         `BBOX=${bbox}&` +
         `X=${Math.round(point.x)}&` +
         `Y=${Math.round(point.y)}` +
-        `&TIME=${getIsoTime(timestamps[currentIndex].timestamp)}`;
+        `&TIME=${getIsoTime(
+            timestamps[currentIndex].timestamp
+        )}`;
 
-    try {
-        const response = await fetch(url);
-        const text = await response.text();
+    const response = await fetch(url);
 
-        console.log(text);
+    return await response.text();
+}
 
-        const match = text.match(/GRAY_INDEX = ([\d.-]+)/);
+// Update Info Panel
+async function updateInfoPanel() {
 
-        let temperature = "No data";
+    if (!selectedPoint) return;
 
-        if (match && match[1]) {
-            temperature = parseFloat(match[1]).toFixed(2);
-        }
+    const tempText =
+        await queryLayer(
+            "weather:temperature",
+            selectedPoint
+        );
 
-        L.popup()
-            .setLatLng(e.latlng)
-            .setContent(`
-                <b>Weather Info</b><br/>
-                Lat: ${e.latlng.lat.toFixed(4)}<br/>
-                Lon: ${e.latlng.lng.toFixed(4)}<br/>
-                Temperature: ${temperature} °C
-            `)
-            .openOn(map);
+    const precipText =
+        await queryLayer(
+            "weather:precipitation",
+            selectedPoint
+        );
 
-    } catch (err) {
-        console.error(err);
-    }
+    const tempMatch =
+        tempText.match(/GRAY_INDEX = ([\d.-]+)/);
+
+    const precipMatch =
+        precipText.match(/GRAY_INDEX = ([\d.-]+)/);
+
+    const temperature =
+        tempMatch
+        ? parseFloat(tempMatch[1]).toFixed(2)
+        : "No data";
+
+    const precipitation =
+        precipMatch
+        ? parseFloat(precipMatch[1]).toFixed(2)
+        : "No data";
+
+    document.getElementById(
+        "location-text"
+    ).innerText =
+        `${selectedPoint.lat.toFixed(4)}, ${selectedPoint.lng.toFixed(4)}`;
+
+    document.getElementById(
+        "time-text"
+    ).innerText =
+        formatTimestamp(
+            timestamps[currentIndex].timestamp
+        );
+
+    document.getElementById(
+        "temperature-text"
+    ).innerText =
+        `${temperature} °C`;
+
+    document.getElementById(
+        "precipitation-text"
+    ).innerText =
+        `${precipitation} mm`;
+}
+
+// Info Panel Update On Map Click
+map.on("click", async (e) => {
+
+    selectedPoint = e.latlng;
+
+    updateInfoPanel();
+
 });
