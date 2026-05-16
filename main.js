@@ -33,6 +33,7 @@ variableSelect.addEventListener(
       e.target.value;
 
     await loadTimestamps();
+    updateLegend();
 
   }
 );
@@ -155,6 +156,7 @@ async function loadTimestamps() {
 }
 
 loadTimestamps();
+updateLegend();
 
 slider.addEventListener("input", () => {
 
@@ -259,3 +261,27 @@ fetch("http://localhost:3000/api/aqi")
 
   })
   .catch(err => console.error(err));
+
+// Update Legend
+function updateLegend() {
+
+  const legendImg =
+    document.getElementById(
+      "legend-image"
+    );
+
+  const layerName =
+    VARIABLE_CONFIG[
+      currentVariable
+    ].layer;
+
+  legendImg.src =
+    "http://localhost:8080/geoserver/wms?" +
+    "REQUEST=GetLegendGraphic" +
+    "&VERSION=1.0.0" +
+    "&FORMAT=image/png" +
+    "&WIDTH=20" +
+    "&HEIGHT=20" +
+    "&LAYER=" + layerName;
+
+}
