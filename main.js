@@ -6,6 +6,7 @@ let isPlaying = false;
 let playbackInterval = null;
 let currentVariable = "temperature"; 
 let selectedPoint = null;
+let selectedPointMarker = null;
 
 const VARIABLE_CONFIG = {
 
@@ -81,6 +82,19 @@ L.control.layers({
   "Street Map": osm,
   "Satellite": satellite
 }).addTo(map);
+
+const selectedPointIcon = L.icon({
+    iconUrl:
+        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+
+    shadowUrl:
+        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
 
 // const marker = L.marker([21.0285, 105.8542]).addTo(map).bindPopup("<b>Hà Nội</b><br/>Thủ đô Việt Nam").openPopup();
 
@@ -364,6 +378,26 @@ async function queryLayer(layerName, latlng) {
     return await response.text();
 }
 
+// Update Selected Point Marker
+function updateSelectedPointMarker(latlng) {
+
+    if (!selectedPointMarker) {
+
+        selectedPointMarker = L.marker(
+            latlng,
+            {
+                icon: selectedPointIcon
+            }
+        ).addTo(map);
+
+    } else {
+
+        selectedPointMarker.setLatLng(latlng);
+
+    }
+
+}
+
 // Update Info Panel
 async function updateInfoPanel() {
 
@@ -424,6 +458,8 @@ async function updateInfoPanel() {
 map.on("click", async (e) => {
 
     selectedPoint = e.latlng;
+
+    updateSelectedPointMarker(e.latlng);
 
     updateInfoPanel();
 
