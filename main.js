@@ -428,18 +428,47 @@ async function updateInfoPanel() {
 
     if (!selectedPoint) return;
 
-    const tempText =
-        await queryLayer(
+    // Change text to "Loading..." while fetching data
+    document.getElementById(
+        "location-text"
+    ).innerText = "Loading...";
+
+    document.getElementById(
+        "temperature-text"
+    ).innerText = "Loading...";
+
+    document.getElementById(
+        "time-text"
+    ).innerText = "Loading...";
+
+    document.getElementById(
+        "precipitation-text"
+    ).innerText = "Loading...";
+
+    // Fetch data at selected point
+    const [
+        tempText,
+        precipText,
+        locationName
+    ] = await Promise.all([
+
+        queryLayer(
             "weather:temperature",
             selectedPoint
-        );
+        ),
 
-    const precipText =
-        await queryLayer(
+        queryLayer(
             "weather:precipitation",
             selectedPoint
-        );
+        ),
 
+        reverseGeocode(
+            selectedPoint
+        )
+
+    ]);
+
+    // Process query results
     const tempMatch =
         tempText.match(/GRAY_INDEX = ([\d.-]+)/);
 
@@ -461,11 +490,7 @@ async function updateInfoPanel() {
     ).innerText =
         `${selectedPoint.lat.toFixed(4)}, ${selectedPoint.lng.toFixed(4)}`;
 
-    const locationName =
-        await reverseGeocode(
-            selectedPoint
-        );
-
+    // Update info panel with fetched data
     document.getElementById(
         "location-text"
     ).innerText =
