@@ -6,6 +6,7 @@ let isPlaying = false;
 let playbackInterval = null;
 let currentVariable = "temperature"; 
 let selectedPoint = null;
+let selectedPointMarker = null;
 
 const VARIABLE_CONFIG = {
 
@@ -81,6 +82,19 @@ L.control.layers({
   "Street Map": osm,
   "Satellite": satellite
 }).addTo(map);
+
+const selectedPointIcon = L.icon({
+    iconUrl:
+        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+
+    shadowUrl:
+        "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
 
 // const marker = L.marker([21.0285, 105.8542]).addTo(map).bindPopup("<b>Hà Nội</b><br/>Thủ đô Việt Nam").openPopup();
 
@@ -364,23 +378,97 @@ async function queryLayer(layerName, latlng) {
     return await response.text();
 }
 
+// Update Selected Point Marker
+function updateSelectedPointMarker(latlng) {
+
+    if (!selectedPointMarker) {
+
+        selectedPointMarker = L.marker(
+            latlng,
+            {
+                icon: selectedPointIcon
+            }
+        ).addTo(map);
+
+    } else {
+
+        selectedPointMarker.setLatLng(latlng);
+
+    }
+
+}
+
+// Reverse Geocode helper
+async function reverseGeocode(latlng) {
+
+    try {
+
+        const response =
+            await fetch(
+                `http://localhost:3000/api/reverse-geocode?lat=${latlng.lat}&lon=${latlng.lng}`
+            );
+
+        const data =
+            await response.json();
+
+        return data.display_name;
+
+    } catch (err) {
+
+        console.error(err);
+
+        return "Unknown location";
+
+    }
+
+}
+
 // Update Info Panel
 async function updateInfoPanel() {
 
     if (!selectedPoint) return;
 
-    const tempText =
-        await queryLayer(
+    // Change text to "Loading..." while fetching data
+    document.getElementById(
+        "location-text"
+    ).innerText = "Loading...";
+
+    document.getElementById(
+        "temperature-text"
+    ).innerText = "Loading...";
+
+    document.getElementById(
+        "time-text"
+    ).innerText = "Loading...";
+
+    document.getElementById(
+        "precipitation-text"
+    ).innerText = "Loading...";
+
+    // Fetch data at selected point
+    const [
+        tempText,
+        precipText,
+        locationName
+    ] = await Promise.all([
+
+        queryLayer(
             "weather:temperature",
             selectedPoint
-        );
+        ),
 
-    const precipText =
-        await queryLayer(
+        queryLayer(
             "weather:precipitation",
             selectedPoint
-        );
+        ),
 
+        reverseGeocode(
+            selectedPoint
+        )
+
+    ]);
+
+    // Process query results
     const tempMatch =
         tempText.match(/GRAY_INDEX = ([\d.-]+)/);
 
@@ -398,9 +486,15 @@ async function updateInfoPanel() {
         : "No data";
 
     document.getElementById(
-        "location-text"
+        "coordinate-text"
     ).innerText =
         `${selectedPoint.lat.toFixed(4)}, ${selectedPoint.lng.toFixed(4)}`;
+
+    // Update info panel with fetched data
+    document.getElementById(
+        "location-text"
+    ).innerText =
+        locationName;
 
     document.getElementById(
         "time-text"
@@ -424,6 +518,8 @@ async function updateInfoPanel() {
 map.on("click", async (e) => {
 
     selectedPoint = e.latlng;
+
+    updateSelectedPointMarker(e.latlng);
 
     updateInfoPanel();
 
