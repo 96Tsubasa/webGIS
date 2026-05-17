@@ -398,6 +398,31 @@ function updateSelectedPointMarker(latlng) {
 
 }
 
+// Reverse Geocode helper
+async function reverseGeocode(latlng) {
+
+    try {
+
+        const response =
+            await fetch(
+                `http://localhost:3000/api/reverse-geocode?lat=${latlng.lat}&lon=${latlng.lng}`
+            );
+
+        const data =
+            await response.json();
+
+        return data.display_name;
+
+    } catch (err) {
+
+        console.error(err);
+
+        return "Unknown location";
+
+    }
+
+}
+
 // Update Info Panel
 async function updateInfoPanel() {
 
@@ -432,9 +457,19 @@ async function updateInfoPanel() {
         : "No data";
 
     document.getElementById(
-        "location-text"
+        "coordinate-text"
     ).innerText =
         `${selectedPoint.lat.toFixed(4)}, ${selectedPoint.lng.toFixed(4)}`;
+
+    const locationName =
+        await reverseGeocode(
+            selectedPoint
+        );
+
+    document.getElementById(
+        "location-text"
+    ).innerText =
+        locationName;
 
     document.getElementById(
         "time-text"
