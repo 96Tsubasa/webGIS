@@ -79,8 +79,8 @@ satellite.addTo(map);
 
 // Control
 L.control.layers({
-  "Street Map": osm,
-  "Satellite": satellite
+  "Đường phố": osm,
+  "Vệ tinh": satellite
 }).addTo(map);
 
 const selectedPointIcon = L.icon({
@@ -417,7 +417,7 @@ async function reverseGeocode(latlng) {
 
         console.error(err);
 
-        return "Unknown location";
+        return "Không xác định";
 
     }
 
@@ -428,22 +428,24 @@ async function updateInfoPanel() {
 
     if (!selectedPoint) return;
 
-    // Change text to "Loading..." while fetching data
+    // Change text to "Đang tải..." while fetching data
+    const loadingText = "Đang tải...";
+    
     document.getElementById(
         "location-text"
-    ).innerText = "Loading...";
+    ).innerText = loadingText;
 
     document.getElementById(
         "temperature-text"
-    ).innerText = "Loading...";
+    ).innerText = loadingText;
 
     document.getElementById(
         "time-text"
-    ).innerText = "Loading...";
+    ).innerText = loadingText;
 
     document.getElementById(
         "precipitation-text"
-    ).innerText = "Loading...";
+    ).innerText = loadingText;
 
     // Fetch data at selected point
     const [
