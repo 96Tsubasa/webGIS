@@ -289,6 +289,30 @@ dbtype=h2
   }
 }
 
+// Clear mosaic index files to force GeoServer to reindex on next access
+function clearMosaicIndex(variableKey) {
+  const dir = getMosaicDir(variableKey);
+
+  for (const file of fs.readdirSync(dir)) {
+    if (
+      file.startsWith("mosaic.") &&
+      file.endsWith(".db")
+    ) {
+      const fullPath = path.join(dir, file);
+
+      fs.rmSync(
+        fullPath,
+        { force: true }
+      );
+
+      console.log(
+        `[${variableKey}] Deleted mosaic index file:`,
+        fullPath
+      );
+    }
+  }
+}
+
 function cleanupOldFiles(variableKey) {
 
   const dirs = [
@@ -604,6 +628,7 @@ async function run() {
 
     cleanupOldFiles(variable.key);
 
+    clearMosaicIndex(variable.key);
   }
 
   await reloadGeoServer();
