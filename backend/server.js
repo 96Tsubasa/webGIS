@@ -19,22 +19,12 @@ cron.schedule("15 */6 * * *", async () => {
 
 // chạy ngay khi start (để test)
 (async () => {
-
   try {
-
     await run();
-
   } catch (err) {
-
-    console.error(
-      "Initial pipeline failed:",
-      err
-    );
-
+    console.error("Initial pipeline failed:", err);
   }
-
 })();
-
 
 // Mount route
 app.use("/api/timestamps", timestampsRoute);

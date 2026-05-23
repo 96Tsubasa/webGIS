@@ -3,68 +3,38 @@ const express = require("express");
 const router = express.Router();
 
 router.get("/", async (req, res) => {
+  const nx = 120;
+  const ny = 80;
 
-    const nx = 120;
-    const ny = 80;
+  const u = [];
+  const v = [];
 
-    const u = [];
-    const v = [];
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) {
+      const angle = x / 15;
 
-    for (
-        let y = 0;
-        y < ny;
-        y++
-    ) {
+      u.push(Math.sin(angle) * 5);
 
-        for (
-            let x = 0;
-            x < nx;
-            x++
-        ) {
-
-            const angle =
-                x / 15;
-
-            u.push(
-                Math.sin(
-                    angle
-                ) * 5
-            );
-
-            v.push(
-                Math.cos(
-                    angle
-                ) * 5
-            );
-
-        }
-
+      v.push(Math.cos(angle) * 5);
     }
+  }
 
-    res.json({
+  res.json({
+    header: {
+      nx,
+      ny,
 
-        header: {
+      lo1: 102,
+      la1: 25,
 
-            nx,
-            ny,
+      dx: 0.067,
 
-            lo1: 102,
-            la1: 25,
+      dy: 0.067,
+    },
 
-            dx:
-                0.067,
-
-            dy:
-                0.067
-
-        },
-
-        u,
-        v
-
-    });
-
+    u,
+    v,
+  });
 });
 
-module.exports =
-    router;
+module.exports = router;

@@ -1,118 +1,88 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <title>WebGIS Base Map</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <title>WebGIS Base Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <div id="map"></div>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="map"></div>
 
-  <div id="info-panel">
+    <div id="info-panel">
+      <h2>Điểm đang chọn</h2>
 
-    <h2>Điểm đang chọn</h2>
+      <div class="info-block">
+        <b>Tọa độ:</b>
+        <div id="coordinate-text">Chưa chọn</div>
+      </div>
 
-    <div class="info-block">
-      <b>Tọa độ:</b>
-      <div id="coordinate-text">Chưa chọn</div>
-    </div>
+      <div class="info-block">
+        <b>Vị trí:</b>
+        <div id="location-text">Chưa chọn</div>
+      </div>
 
-    <div class="info-block">
-      <b>Vị trí:</b>
-      <div id="location-text">Chưa chọn</div>
-    </div>
+      <div class="info-block">
+        <b>Thời gian:</b>
+        <div id="time-text">-</div>
+      </div>
 
-    <div class="info-block">
-      <b>Thời gian:</b>
-      <div id="time-text">-</div>
-    </div>
+      <div class="info-block">
+        <b>Nhiệt độ:</b>
+        <div id="temperature-text">-</div>
+      </div>
 
-    <div class="info-block">
-      <b>Nhiệt độ:</b>
-      <div id="temperature-text">-</div>
-    </div>
+      <div class="info-block">
+        <b>Lượng mưa:</b>
+        <div id="precipitation-text">-</div>
+      </div>
 
-    <div class="info-block">
-      <b>Lượng mưa:</b>
-      <div id="precipitation-text">-</div>
-    </div>
+      <div class="info-block">
+        <b>Gió (thành phần ngang):</b>
+        <div id="wind-u-text">-</div>
+      </div>
 
-    <div class="info-block">
-      <b>Gió (thành phần ngang):</b>
-      <div id="wind-u-text">
-        -
+      <div class="info-block">
+        <b>Gió (thành phần dọc):</b>
+        <div id="wind-v-text">-</div>
+      </div>
+
+      <div class="info-block">
+        <b>Gió:</b>
+        <div id="wind-text">-</div>
+      </div>
+
+      <div class="info-block">
+        <b>Hướng:</b>
+        <div id="direction-text">-</div>
       </div>
     </div>
 
-    <div class="info-block">
-      <b>Gió (thành phần dọc):</b>
-      <div id="wind-v-text">
-        -
-      </div>
+    <div id="legend-container"><img id="legend-image" /></div>
+
+    <select id="weather-variable">
+      <option value="temperature">Nhiệt độ</option>
+
+      <option value="precipitation">Lượng mưa</option>
+
+      <option value="wind">Gió</option>
+    </select>
+
+    <div id="timeline-container">
+      <button id="play-btn">Play</button>
+
+      <input type="range" id="time-slider" min="0" max="0" value="0" step="1" />
+
+      <span id="time-label"> Chưa có dữ liệu </span>
     </div>
 
-    <div class="info-block">
-      <b>Gió:</b>
-      <div id="wind-text">
-        -
-      </div>
-    </div>
-
-    <div class="info-block">
-      <b>Hướng:</b>
-      <div id="direction-text">
-        -
-      </div>
-    </div>
-  </div>
-
-  <div id="legend-container"> <img id="legend-image" /> </div>
-
-  <select id="weather-variable">
-    <option value="temperature">
-      Nhiệt độ
-    </option>
-
-    <option value="precipitation">
-      Lượng mưa
-    </option>
-
-    <option value="wind_u">
-      Gió (thành phần ngang)
-    </option>
-
-    <option value="wind_v">
-      Gió (thành phần dọc)
-    </option>
-  </select>
-
-  <div id="timeline-container">
-
-    <button id="play-btn">Play</button>
-
-    <input
-      type="range"
-      id="time-slider"
-      min="0"
-      max="0"
-      value="0"
-      step="1"
-    />
-
-    <span id="time-label">
-      Chưa có dữ liệu
-    </span>
-
-  </div>
-
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-velocity/dist/leaflet-velocity.min.js"></script>
-  <script src="main.js"></script>
-</body>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-velocity/dist/leaflet-velocity.min.js"></script>
+    <script src="main.js"></script>
+  </body>
 </html>
