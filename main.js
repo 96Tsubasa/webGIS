@@ -1,5 +1,6 @@
 const map = L.map('map').setView([16.311, 106.062], 6);
 let weatherLayer = null;
+let windLayer = null;
 let timestamps = [];
 let currentIndex = 0;
 let isPlaying = false;
@@ -17,6 +18,16 @@ const VARIABLE_CONFIG = {
 
   precipitation: {
     layer: "weather:precipitation",
+    opacity: 0.72
+  },
+
+  wind_u: {
+    layer: "weather:wind_u",
+    opacity: 0.72
+  },
+
+  wind_v: {
+    layer: "weather:wind_v",
     opacity: 0.72
   }
 
@@ -123,6 +134,30 @@ function renderWeatherLayer(timestamp) {
   );
 
   weatherLayer.addTo(map);
+
+  if(
+  currentVariable ===
+  "wind_u" ||
+
+  currentVariable ===
+  "wind_v"
+  ){
+
+  renderWindAnimation();
+
+  }
+  else{
+
+  if(windLayer){
+
+  map.removeLayer(
+  windLayer
+  );
+
+  windLayer =
+  null;
+
+  }}
 
   slider.value = currentIndex;
 
@@ -423,6 +458,22 @@ async function reverseGeocode(latlng) {
 
 }
 
+// Wind direction helper
+function directionText(a){
+
+  if (a<22.5) return "Bắc";
+  if (a<67.5) return "Đông Bắc";
+  if (a<112.5) return "Đông";
+  if (a<157.5) return "Đông Nam";
+  if (a<202.5) return "Nam";
+  if (a<247.5) return "Tây Nam";
+  if (a<292.5) return "Tây";
+  if (a<337.5) return "Tây Bắc";
+
+  return "Bắc";
+
+}
+
 // Update Info Panel
 async function updateInfoPanel() {
 
@@ -447,26 +498,46 @@ async function updateInfoPanel() {
         "precipitation-text"
     ).innerText = loadingText;
 
+    document.getElementById(
+        "wind-u-text"
+    ).innerText = loadingText;
+
+    document.getElementById(
+        "wind-v-text"
+    ).innerText = loadingText;
+
     // Fetch data at selected point
     const [
-        tempText,
-        precipText,
-        locationName
+      tempText,
+      precipText,
+      windUText,
+      windVText,
+      locationName
     ] = await Promise.all([
 
-        queryLayer(
-            "weather:temperature",
-            selectedPoint
-        ),
+      queryLayer(
+        "weather:temperature",
+        selectedPoint
+      ),
 
-        queryLayer(
-            "weather:precipitation",
-            selectedPoint
-        ),
+      queryLayer(
+        "weather:precipitation",
+        selectedPoint
+      ),
 
-        reverseGeocode(
-            selectedPoint
-        )
+      queryLayer(
+        "weather:wind_u",
+        selectedPoint
+      ),
+
+      queryLayer(
+        "weather:wind_v",
+        selectedPoint
+      ),
+
+      reverseGeocode(
+        selectedPoint
+      )
 
     ]);
 
@@ -486,6 +557,47 @@ async function updateInfoPanel() {
         precipMatch
         ? parseFloat(precipMatch[1]).toFixed(2)
         : "No data";
+
+    const windUMatch =
+      windUText.match(
+        /GRAY_INDEX = ([\d.-]+)/
+      );
+
+    const windVMatch =
+      windVText.match(
+        /GRAY_INDEX = ([\d.-]+)/
+      );
+
+    const u =
+      windUMatch
+        ? parseFloat(
+            windUMatch[1]
+          )
+        : 0;
+
+    const v =
+      windVMatch
+        ? parseFloat(
+            windVMatch[1]
+          )
+        : 0;
+
+    const windSpeed =
+      Math.sqrt(
+        u*u +
+        v*v
+      );
+
+    const angle =
+      (
+        Math.atan2(
+          u,
+          v
+        ) *
+        180 /
+        Math.PI +
+        360
+      ) % 360;
 
     document.getElementById(
         "coordinate-text"
@@ -514,6 +626,26 @@ async function updateInfoPanel() {
         "precipitation-text"
     ).innerText =
         `${precipitation} mm`;
+
+    document.getElementById(
+        "wind-u-text"
+    ).innerText =
+        `${u} m/s`;
+
+    document.getElementById(
+        "wind-v-text"
+    ).innerText =
+        `${v} m/s`;
+
+    document.getElementById(
+        "wind-text"
+    ).innerText =
+        `${windSpeed.toFixed(2)} m/s`;
+
+    document.getElementById(
+        "direction-text"
+    ).innerText =
+        `${directionText(angle)}`;
 }
 
 // Info Panel Update On Map Click
@@ -526,3 +658,119 @@ map.on("click", async (e) => {
     updateInfoPanel();
 
 });
+
+// Render wind
+async function renderWindAnimation() {
+
+  if (windLayer) {
+    map.removeLayer(windLayer);
+  }
+
+  const response =
+    await fetch(
+      `http://localhost:3000/api/wind-field?time=test`
+    );
+
+  console.log("Response:", response);
+
+  const field =
+    await response.json();
+
+
+  windLayer =
+    L.velocityLayer({
+
+      displayValues: false,
+
+      data: [
+
+        {
+          header: {
+
+            nx:
+              field.header.nx,
+
+            ny:
+              field.header.ny,
+
+            lo1:
+              field.header.lo1,
+
+            la1:
+              field.header.la1,
+
+            dx:
+              field.header.dx,
+
+            dy:
+              field.header.dy,
+
+            parameterCategory:
+              2,
+
+            parameterNumber:
+              2
+
+          },
+
+          data:
+            field.u
+
+        },
+
+        {
+          header: {
+
+            nx:
+              field.header.nx,
+
+            ny:
+              field.header.ny,
+
+            lo1:
+              field.header.lo1,
+
+            la1:
+              field.header.la1,
+
+            dx:
+              field.header.dx,
+
+            dy:
+              field.header.dy,
+
+            parameterCategory:
+              2,
+
+            parameterNumber:
+              3
+
+          },
+
+          data:
+            field.v
+
+        }
+
+      ],
+
+      velocityScale:
+        0.005,
+
+      particleAge:
+        60,
+
+      lineWidth:
+        2,
+
+      frameRate:
+        30,
+
+      maxVelocity:
+        20
+
+    });
+
+  windLayer.addTo(map);
+
+}

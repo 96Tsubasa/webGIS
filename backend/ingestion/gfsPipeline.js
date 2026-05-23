@@ -40,6 +40,30 @@ const VARIABLES = [
     gdalBand: 1,
 
     startHour: 1
+  },
+
+  {
+    key: "wind_u",
+
+    levelQuery:
+      "&lev_10_m_above_ground=on",
+
+    variableQuery:
+      "&var_UGRD=on",
+
+    gdalBand: null
+  },
+
+  {
+    key: "wind_v",
+
+    levelQuery:
+      "&lev_10_m_above_ground=on",
+
+    variableQuery:
+      "&var_VGRD=on",
+
+    gdalBand: null
   }
 
 ];
@@ -628,7 +652,8 @@ async function run() {
 
     cleanupOldFiles(variable.key);
 
-    clearMosaicIndex(variable.key);
+    // Delete these files when GeoServer is running might cause error loop, manually delete them for now
+    // clearMosaicIndex(variable.key);
   }
 
   await reloadGeoServer();

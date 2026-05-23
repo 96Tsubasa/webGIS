@@ -42,6 +42,33 @@
       <div id="precipitation-text">-</div>
     </div>
 
+    <div class="info-block">
+      <b>Gió (thành phần ngang):</b>
+      <div id="wind-u-text">
+        -
+      </div>
+    </div>
+
+    <div class="info-block">
+      <b>Gió (thành phần dọc):</b>
+      <div id="wind-v-text">
+        -
+      </div>
+    </div>
+
+    <div class="info-block">
+      <b>Gió:</b>
+      <div id="wind-text">
+        -
+      </div>
+    </div>
+
+    <div class="info-block">
+      <b>Hướng:</b>
+      <div id="direction-text">
+        -
+      </div>
+    </div>
   </div>
 
   <div id="legend-container"> <img id="legend-image" /> </div>
@@ -53,6 +80,14 @@
 
     <option value="precipitation">
       Lượng mưa
+    </option>
+
+    <option value="wind_u">
+      Gió (thành phần ngang)
+    </option>
+
+    <option value="wind_v">
+      Gió (thành phần dọc)
     </option>
   </select>
 
@@ -77,6 +112,7 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-velocity/dist/leaflet-velocity.min.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
