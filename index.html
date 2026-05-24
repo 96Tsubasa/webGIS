@@ -27,23 +27,35 @@
       <div class="panel-body">
         <div class="stats-grid">
           <div class="stat">
-            <div class="stat-label">Nhiệt độ</div>
-            <div id="temperature-text" class="stat-value">-</div>
+            <div class="stat-icon">🌡️</div>
+            <div>
+              <div class="stat-label">Nhiệt độ</div>
+              <div id="temperature-text" class="stat-value">-</div>
+            </div>
           </div>
 
           <div class="stat">
-            <div class="stat-label">Lượng mưa</div>
-            <div id="precipitation-text" class="stat-value">-</div>
+            <div class="stat-icon">🌧️</div>
+            <div>
+              <div class="stat-label">Lượng mưa</div>
+              <div id="precipitation-text" class="stat-value">-</div>
+            </div>
           </div>
 
           <div class="stat">
-            <div class="stat-label">Gió</div>
-            <div id="wind-text" class="stat-value">-</div>
+            <div class="stat-icon">💨</div>
+            <div>
+              <div class="stat-label">Gió</div>
+              <div id="wind-text" class="stat-value">-</div>
+            </div>
           </div>
 
           <div class="stat">
-            <div class="stat-label">Hướng</div>
-            <div id="direction-text" class="stat-value">-</div>
+            <div class="stat-icon">🧭</div>
+            <div>
+              <div class="stat-label">Hướng</div>
+              <div id="direction-text" class="stat-value">-</div>
+            </div>
           </div>
         </div>
 
@@ -73,9 +85,13 @@
       <option value="temperature">Nhiệt độ</option>
 
       <option value="precipitation">Lượng mưa</option>
-
-      <option value="wind">Gió</option>
     </select>
+
+    <div id="wind-toggle">
+      <label>
+        <input type="checkbox" id="wind-toggle-input" checked /> Hiển thị Gió
+      </label>
+    </div>
 
     <div id="timeline-container">
       <button id="play-btn">Play</button>

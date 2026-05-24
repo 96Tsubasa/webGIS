@@ -5,6 +5,7 @@
 This project is a WebGIS weather visualization system.
 
 Main goal:
+
 - Display weather forecast layers on a web map.
 - Support time-series forecast navigation.
 - Render animated wind field.
@@ -15,11 +16,11 @@ A different context version is saved as webgis_thoitiet_context_v9.pdf
 Current architecture:
 
 GFS Pipeline
-    ↓
+↓
 Processed Weather Data
-    ↓
+↓
 GeoServer (WMS / WCS)
-    ↓
+↓
 Frontend (Leaflet + JS)
 
 Exception: Wind data does not need GeoServer to be served as tiles — the Backend provides wind vector grids (u/v) and the Frontend uses `leaflet-velocity.min.js` to draw wind animation.
@@ -29,6 +30,7 @@ Exception: Wind data does not need GeoServer to be served as tiles — the Backe
 ## Current Features
 
 Implemented:
+
 - Load available forecast timestamps
 - Render weather layers from GeoServer
 - Time slider navigation
@@ -37,6 +39,7 @@ Implemented:
 - Weather charts
 
 Recently completed:
+
 - Wind animation appears correctly
 - Wind vector direction issue (v-axis inversion) has been fixed
 - Temperature and precipitation data are now separated by timestamp
@@ -45,6 +48,7 @@ Recently completed:
 - Wind visualization remains animation-based (no dedicated chart)
 
 Planned:
+
 - Improve UI/UX
 - Optimize rendering performance
 - Finalize graduation thesis demo
@@ -56,10 +60,12 @@ Planned:
 Frontend:
 
 index.html
+
 - Main UI layout
 
 main.js
 Responsibilities:
+
 - App bootstrap
 - Map initialization
 - Layer switching
@@ -70,6 +76,7 @@ Responsibilities:
 - Wind animation orchestration
 
 Frontend tech highlights:
+
 - Uses `Leaflet` for the map (not OpenLayers).
 - Uses `leaflet-velocity.min.js` for wind animation and `Chart.js` for charts.
 
@@ -79,6 +86,7 @@ Backend / Pipeline:
 
 gfsPipeline.js
 Responsibilities:
+
 - Fetch latest GFS cycle
 - Process weather files
 - Generate outputs
@@ -86,6 +94,7 @@ Responsibilities:
 
 wind-field.js (backend/routes/wind-field.js)
 Responsibilities:
+
 - Read GeoTIFF files for wind components (u/v), reshape into 2D grids and return JSON payload
 - Provide caching for wind field responses (TTL ~10 minutes, bounded cache entries)
 - Frontend consumes this endpoint to render animated wind using `leaflet-velocity`
@@ -93,6 +102,7 @@ Responsibilities:
 Context:
 
 webgis_thoitiet_context_v9.pdf
+
 - Project history
 - Design decisions
 - Progress tracking
@@ -116,11 +126,13 @@ Docker & Runtime notes:
 Do NOT rewrite large modules unless requested.
 
 Prefer:
+
 - Small patches
 - Isolated fixes
 - Preserve existing flow
 
 Avoid:
+
 - Framework migration
 - Massive refactor
 
@@ -142,14 +154,17 @@ Do NOT blindly regenerate files.
 ### Rule 3 — Weather data assumptions
 
 Temperature:
+
 - Continuous value
 - Use line chart
 
 Precipitation:
+
 - Discrete accumulation
 - Use bar chart
 
 Wind:
+
 - Prefer particle animation
 - Avoid chart unless requested
 
@@ -158,15 +173,18 @@ Wind:
 ### Rule 4 — Frontend conventions
 
 Use:
+
 - async/await
 - Early return
 - Small functions
 
 Avoid:
+
 - Deep nesting
 - Global mutable state
 
 Preserve:
+
 - Existing naming
 - Existing event flow
 
@@ -189,12 +207,14 @@ Do NOT produce full-file rewrites.
 ## Wind Animation Notes
 
 Expected behavior:
+
 - Wind particles move according to wind vectors
 - Animation updates with timestamp changes
 - No duplicate render loop
 - Cleanup previous frame before redraw
 
 Watch for:
+
 - u/v inversion
 - coordinate mismatch
 - stale animation state
@@ -209,15 +229,19 @@ Debug logs should remain concise.
 Charts are informational only.
 
 Temperature:
+
 - Line chart
 
 Precipitation:
+
 - Bar chart
 
 Wind:
+
 - Optional
 
 Avoid:
+
 - Combining unrelated units
 - Overloaded dual-axis charts
 
@@ -240,15 +264,19 @@ Prioritize:
 When implementing:
 
 First:
+
 - Explain plan
 
 Then:
+
 - Generate code
 
 After:
+
 - Explain why changes work
 
 If uncertain:
+
 - Ask instead of assuming.
 
 Never fabricate APIs or dataset structure.

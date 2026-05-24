@@ -8,6 +8,7 @@ let playbackInterval = null;
 let currentVariable = "temperature";
 let selectedPoint = null;
 let selectedPointMarker = null;
+let windOn = true;
 
 // Chart states
 let temperatureChart = null;
@@ -98,45 +99,33 @@ const selectedPointIcon = L.icon({
 function renderWeatherLayer(timestamp) {
   const isoTime = getIsoTime(timestamp);
 
-  if (currentVariable === "wind") {
-    if (weatherLayer) {
+  // replace weather WMS layer for the selected variable
+  if (weatherLayer) {
+    try {
       map.removeLayer(weatherLayer);
-
-      weatherLayer = null;
-    }
-
-    renderWindAnimation(timestamp);
-  } else {
-    if (windLayer) {
-      map.removeLayer(windLayer);
-
-      windLayer = null;
-    }
-
-    if (weatherLayer) {
-      map.removeLayer(weatherLayer);
-    }
-
-    weatherLayer = L.tileLayer.wms(
-      "http://localhost:8080/geoserver/weather/wms",
-
-      {
-        layers: VARIABLE_CONFIG[currentVariable].layer,
-
-        format: "image/png",
-
-        transparent: true,
-
-        opacity: VARIABLE_CONFIG[currentVariable].opacity,
-
-        time: isoTime,
-
-        zIndex: 1000,
-      },
-    );
-
-    weatherLayer.addTo(map);
+    } catch (e) {}
+    weatherLayer = null;
   }
+
+  weatherLayer = L.tileLayer.wms(
+    "http://localhost:8080/geoserver/weather/wms",
+
+    {
+      layers: VARIABLE_CONFIG[currentVariable].layer,
+
+      format: "image/png",
+
+      transparent: true,
+
+      opacity: VARIABLE_CONFIG[currentVariable].opacity,
+
+      time: isoTime,
+
+      zIndex: 1000,
+    },
+  );
+
+  weatherLayer.addTo(map);
 
   slider.value = currentIndex;
 
@@ -144,13 +133,18 @@ function renderWeatherLayer(timestamp) {
 
   // Show chart loading overlays when timestamp changes
   function toggleChartLoading(show) {
-    const overlays = document.querySelectorAll('.chart-loading');
+    const overlays = document.querySelectorAll(".chart-loading");
     overlays.forEach((ov) => {
-      ov.style.display = show ? 'flex' : 'none';
+      ov.style.display = show ? "flex" : "none";
     });
   }
 
   toggleChartLoading(true);
+
+  // update wind animation for this timestamp if enabled
+  if (windOn) {
+    renderWindAnimation(timestamp);
+  }
 
   if (selectedPoint) {
     updateInfoPanel();
@@ -160,8 +154,7 @@ function renderWeatherLayer(timestamp) {
 // Load timestamps from backend
 async function loadTimestamps() {
   try {
-    const queryVariable =
-      currentVariable === "wind" ? "wind_u" : currentVariable;
+    const queryVariable = currentVariable;
 
     const res = await fetch(
       `http://localhost:3000/api/timestamps?variable=${queryVariable}`,
@@ -314,13 +307,6 @@ function stopPlayback() {
 // Update Legend
 function updateLegend() {
   const legendImg = document.getElementById("legend-image");
-
-  if (currentVariable === "wind") {
-    document.getElementById("legend-image").style.display = "none";
-
-    return;
-  }
-
   document.getElementById("legend-image").style.display = "block";
 
   const layerName = VARIABLE_CONFIG[currentVariable].layer;
@@ -376,6 +362,32 @@ async function queryLayer(
   const response = await fetch(url);
 
   return await response.text();
+}
+
+// Wind toggle helper
+function setWindEnabled(enabled) {
+  windOn = !!enabled;
+
+  if (windOn) {
+    if (timestamps.length > 0) {
+      renderWindAnimation(timestamps[currentIndex].timestamp);
+    }
+  } else {
+    if (windLayer) {
+      try {
+        map.removeLayer(windLayer);
+      } catch (e) {}
+      windLayer = null;
+    }
+  }
+}
+
+// Wire wind toggle input
+const windToggleInput = document.getElementById("wind-toggle-input");
+if (windToggleInput) {
+  windToggleInput.addEventListener("change", (e) => {
+    setWindEnabled(e.target.checked);
+  });
 }
 
 // Update Selected Point Marker
@@ -482,7 +494,6 @@ async function updateInfoPanel() {
   const windSpeed = Math.sqrt(u * u + v * v);
 
   const angle = ((Math.atan2(u, v) * 180) / Math.PI + 360) % 360;
-
 
   // Update info panel with fetched data (guarded writes)
   setText("location-text", locationName);
@@ -591,15 +602,15 @@ async function renderWindAnimation(timestamp) {
         },
       ],
 
-      velocityScale: 0.003,
+      velocityScale: 0.005,
 
-      particleAge: 45,
+      particleAge: 60,
 
-      lineWidth: 1.5,
+      lineWidth: 2,
 
       frameRate: 40,
 
-      maxVelocity: 15,
+      maxVelocity: 25,
     });
 
     windLayer.addTo(map);
@@ -712,8 +723,8 @@ function renderForecastChart(data) {
   );
 
   // hide loading overlays after charts rendered
-  const overlays = document.querySelectorAll('.chart-loading');
-  overlays.forEach((ov) => (ov.style.display = 'none'));
+  const overlays = document.querySelectorAll(".chart-loading");
+  overlays.forEach((ov) => (ov.style.display = "none"));
 }
 
 // Close button for info panel
