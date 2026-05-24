@@ -142,6 +142,16 @@ function renderWeatherLayer(timestamp) {
 
   label.innerText = formatTimestamp(timestamp);
 
+  // Show chart loading overlays when timestamp changes
+  function toggleChartLoading(show) {
+    const overlays = document.querySelectorAll('.chart-loading');
+    overlays.forEach((ov) => {
+      ov.style.display = show ? 'flex' : 'none';
+    });
+  }
+
+  toggleChartLoading(true);
+
   if (selectedPoint) {
     updateInfoPanel();
   }
@@ -197,8 +207,24 @@ async function loadTimestamps() {
   }
 }
 
-loadTimestamps();
-updateLegend();
+// Load timestamps and then set a default selected point for the info panel
+loadTimestamps().then(() => {
+  updateLegend();
+
+  // default location (Hà Nội) — used to populate info panel on load
+  const defaultPoint = L.latLng(21.0285, 105.8542);
+
+  selectedPoint = defaultPoint;
+
+  updateSelectedPointMarker(defaultPoint);
+
+  // Pan map to default point so user sees the marker
+  try {
+    map.panTo(defaultPoint);
+  } catch (e) {}
+
+  updateInfoPanel();
+});
 
 slider.addEventListener("input", () => {
   currentIndex = parseInt(slider.value);
@@ -398,16 +424,25 @@ function directionText(a) {
 async function updateInfoPanel() {
   if (!selectedPoint) return;
 
+  // ensure panel is visible when selecting a point
+  const infoPanelEl = document.getElementById("info-panel");
+  if (infoPanelEl) infoPanelEl.style.display = "block";
+
   // Change text to "Đang tải..." while fetching data
   const loadingText = "Đang tải...";
 
-  document.getElementById("location-text").innerText = loadingText;
+  // safe setter to avoid null element errors
+  function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text;
+  }
 
-  document.getElementById("temperature-text").innerText = loadingText;
-
-  document.getElementById("time-text").innerText = loadingText;
-
-  document.getElementById("precipitation-text").innerText = loadingText;
+  setText("location-text", loadingText);
+  setText("temperature-text", loadingText);
+  setText("time-text", loadingText);
+  setText("precipitation-text", loadingText);
+  setText("wind-text", loadingText);
+  setText("direction-text", loadingText);
 
   // Fetch data at selected point
   const [tempText, precipText, windUText, windVText, locationName] =
@@ -448,26 +483,19 @@ async function updateInfoPanel() {
 
   const angle = ((Math.atan2(u, v) * 180) / Math.PI + 360) % 360;
 
-  document.getElementById("coordinate-text").innerText =
-    `${selectedPoint.lat.toFixed(4)}, ${selectedPoint.lng.toFixed(4)}`;
 
-  // Update info panel with fetched data
-  document.getElementById("location-text").innerText = locationName;
+  // Update info panel with fetched data (guarded writes)
+  setText("location-text", locationName);
 
-  document.getElementById("time-text").innerText = formatTimestamp(
-    timestamps[currentIndex].timestamp,
-  );
+  setText("time-text", formatTimestamp(timestamps[currentIndex].timestamp));
 
-  document.getElementById("temperature-text").innerText = `${temperature} °C`;
+  setText("temperature-text", `${temperature} °C`);
 
-  document.getElementById("precipitation-text").innerText =
-    `${precipitation} mm`;
+  setText("precipitation-text", `${precipitation} mm`);
 
-  document.getElementById("wind-text").innerText =
-    `${windSpeed.toFixed(2)} m/s`;
+  setText("wind-text", `${windSpeed.toFixed(2)} m/s`);
 
-  document.getElementById("direction-text").innerText =
-    `${directionText(angle)}`;
+  setText("direction-text", `${directionText(angle)}`);
 
   loadForecastSeries();
 }
@@ -682,4 +710,17 @@ function renderForecastChart(data) {
       },
     },
   );
+
+  // hide loading overlays after charts rendered
+  const overlays = document.querySelectorAll('.chart-loading');
+  overlays.forEach((ov) => (ov.style.display = 'none'));
+}
+
+// Close button for info panel
+const closeBtn = document.getElementById("close-info");
+if (closeBtn) {
+  closeBtn.addEventListener("click", () => {
+    const p = document.getElementById("info-panel");
+    if (p) p.style.display = "none";
+  });
 }

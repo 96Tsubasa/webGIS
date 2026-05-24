@@ -14,53 +14,56 @@
     <div id="map"></div>
 
     <div id="info-panel">
-      <h2>Điểm đang chọn</h2>
-
-      <div class="info-block">
-        <b>Tọa độ:</b>
-        <div id="coordinate-text">Chưa chọn</div>
+      <div class="panel-header">
+        <div class="header-text">
+          <div id="location-text">Chưa chọn</div>
+          <div id="time-text">-</div>
+        </div>
+        <div class="header-actions">
+          <button id="close-info" aria-label="Close">×</button>
+        </div>
       </div>
 
-      <div class="info-block">
-        <b>Vị trí:</b>
-        <div id="location-text">Chưa chọn</div>
-      </div>
+      <div class="panel-body">
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-label">Nhiệt độ</div>
+            <div id="temperature-text" class="stat-value">-</div>
+          </div>
 
-      <div class="info-block">
-        <b>Thời gian:</b>
-        <div id="time-text">-</div>
-      </div>
+          <div class="stat">
+            <div class="stat-label">Lượng mưa</div>
+            <div id="precipitation-text" class="stat-value">-</div>
+          </div>
 
-      <div class="info-block">
-        <b>Nhiệt độ:</b>
-        <div id="temperature-text">-</div>
-      </div>
+          <div class="stat">
+            <div class="stat-label">Gió</div>
+            <div id="wind-text" class="stat-value">-</div>
+          </div>
 
-      <div class="info-block">
-        <b>Lượng mưa:</b>
-        <div id="precipitation-text">-</div>
-      </div>
+          <div class="stat">
+            <div class="stat-label">Hướng</div>
+            <div id="direction-text" class="stat-value">-</div>
+          </div>
+        </div>
 
-      <div class="info-block">
-        <b>Gió:</b>
-        <div id="wind-text">-</div>
-      </div>
+        <div class="forecast-section">
+          <div class="forecast-title">Dự báo nhiệt độ</div>
+          <div class="chart-card">
+            <canvas id="temperature-chart" height="140"></canvas>
+            <div class="chart-loading" data-chart="temperature">
+              <div class="spinner"></div>
+            </div>
+          </div>
 
-      <div class="info-block">
-        <b>Hướng:</b>
-        <div id="direction-text">-</div>
-      </div>
-
-      <div class="info-block">
-        <b>Nhiệt độ dự báo</b>
-
-        <canvas id="temperature-chart" height="150"> </canvas>
-      </div>
-
-      <div class="info-block">
-        <b>Lượng mưa dự báo</b>
-
-        <canvas id="precipitation-chart" height="150"> </canvas>
+          <div class="forecast-title">Dự báo lượng mưa</div>
+          <div class="chart-card">
+            <canvas id="precipitation-chart" height="140"></canvas>
+            <div class="chart-loading" data-chart="precipitation">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
