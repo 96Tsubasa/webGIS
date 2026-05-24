@@ -20,9 +20,9 @@ Processed Weather Data
     ↓
 GeoServer (WMS / WCS)
     ↓
-Frontend (OpenLayers + JS)
+Frontend (Leaflet + JS)
 
-Exception: Wind data does not need GeoServer to process, Backend send wind vector data and Frontend use leaflet-velocity.min.js to draw wind animation.
+Exception: Wind data does not need GeoServer to be served as tiles — the Backend provides wind vector grids (u/v) and the Frontend uses `leaflet-velocity.min.js` to draw wind animation.
 
 ---
 
@@ -69,12 +69,11 @@ Responsibilities:
 - Chart rendering
 - Wind animation orchestration
 
-wind-field.js
-Responsibilities:
-- Wind field generation
-- Particle simulation
-- Animation loop
-- Wind vector handling
+Frontend tech highlights:
+- Uses `Leaflet` for the map (not OpenLayers).
+- Uses `leaflet-velocity.min.js` for wind animation and `Chart.js` for charts.
+
+<!-- moved: wind-field.js responsibilities are implemented server-side in backend/routes/wind-field.js -->
 
 Backend / Pipeline:
 
@@ -85,12 +84,28 @@ Responsibilities:
 - Generate outputs
 - Update GeoServer resources
 
+wind-field.js (backend/routes/wind-field.js)
+Responsibilities:
+- Read GeoTIFF files for wind components (u/v), reshape into 2D grids and return JSON payload
+- Provide caching for wind field responses (TTL ~10 minutes, bounded cache entries)
+- Frontend consumes this endpoint to render animated wind using `leaflet-velocity`
+
 Context:
 
 webgis_thoitiet_context_v9.pdf
 - Project history
 - Design decisions
 - Progress tracking
+
+Docker & Runtime notes:
+
+- `docker-compose.yml` defines services `backend` (built from `./backend`) and `geoserver` (image `docker.osgeo.org/geoserver:2.28.0`).
+- Port mapping: backend -> `3000:3000`, geoserver -> `8080:8080`.
+- Data volume: `./backend/data` is mounted into both containers at `/data` so GeoServer can read generated mosaics and the backend can write ingestion outputs.
+- `backend/Dockerfile` installs `gdal-bin` and the pipeline uses `gdal_translate` to convert GRIB2 → GeoTIFF.
+- Runtime file: `backend/data/latest_cycle.json` is produced by the ingestion pipeline at runtime (not included in repo by default).
+- Note: `backend/server.js` listens on port `3000`, but `backend/Dockerfile` currently contains `EXPOSE 5000` — consider aligning to `EXPOSE 3000` or update the server port.
+- Wind field caching: the backend `wind-field` route implements an in-memory cache (TTL ~10 minutes, max entries) to reduce repeated GeoTIFF reads.
 
 ---
 
