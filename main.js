@@ -5,10 +5,13 @@ let timestamps = [];
 let currentIndex = 0;
 let isPlaying = false;
 let playbackInterval = null;
+let renderTimeout = null;
+const RENDER_DEBOUNCE_MS = 600; // wait after changes before rendering
+const PLAYBACK_INTERVAL_MS = 3000; // slower playback to reduce requests
 let currentVariable = "temperature";
 let selectedPoint = null;
 let selectedPointMarker = null;
-let windOn = true;
+let windOn = false;
 
 // Chart states
 let temperatureChart = null;
@@ -28,8 +31,11 @@ const VARIABLE_CONFIG = {
 };
 
 const slider = document.getElementById("time-slider");
-const label = document.getElementById("time-label");
 const playBtn = document.getElementById("play-btn");
+const sliderTicksEl = document.getElementById("slider-ticks");
+const sliderProgressEl = document.getElementById("slider-progress");
+const sliderHandleEl = document.getElementById("slider-handle");
+const sliderHandleLabel = document.getElementById("slider-time-label");
 const variableSelect = document.getElementById("weather-variable");
 
 variableSelect.addEventListener("change", async (e) => {
@@ -48,6 +54,12 @@ function formatTimestamp(ts) {
   const hour = ts.slice(9, 11);
 
   return `${hour}:00 ${day}/${month}/${year}`;
+}
+
+function parseTimestampToDate(ts) {
+  return new Date(
+    `${ts.slice(0, 4)}-${ts.slice(4, 6)}-${ts.slice(6, 8)}T${ts.slice(9, 11)}:${ts.slice(11, 13)}:${ts.slice(13, 15)}Z`,
+  );
 }
 
 function getIsoTime(timestamp) {
@@ -128,8 +140,6 @@ function renderWeatherLayer(timestamp) {
   weatherLayer.addTo(map);
 
   slider.value = currentIndex;
-
-  label.innerText = formatTimestamp(timestamp);
 
   // Show chart loading overlays when timestamp changes
   function toggleChartLoading(show) {
@@ -217,27 +227,115 @@ loadTimestamps().then(() => {
   } catch (e) {}
 
   updateInfoPanel();
+  // render visual ticks when timestamps are ready
+  renderTicks();
+  updateVisualProgress();
 });
 
 slider.addEventListener("input", () => {
   currentIndex = parseInt(slider.value);
-
-  renderWeatherLayer(timestamps[currentIndex].timestamp);
+  if (slider) slider.value = currentIndex;
+  updateVisualProgress();
+  scheduleRenderForIndex(currentIndex);
 });
 
 playBtn.addEventListener("click", () => {
   isPlaying = !isPlaying;
 
+  const playIcon = document.getElementById("play-icon");
+  const pauseIcon = document.getElementById("pause-icon");
+
   if (isPlaying) {
-    playBtn.innerText = "Pause";
+    if (playIcon) playIcon.style.display = "none";
+    if (pauseIcon) pauseIcon.style.display = "block";
 
     startPlayback();
   } else {
-    playBtn.innerText = "Play";
+    if (playIcon) playIcon.style.display = "block";
+    if (pauseIcon) pauseIcon.style.display = "none";
 
     stopPlayback();
   }
 });
+
+// Render daily ticks between first and last timestamp
+function renderTicks() {
+  if (!sliderTicksEl || timestamps.length === 0) return;
+
+  sliderTicksEl.innerHTML = "";
+
+  const first = parseTimestampToDate(timestamps[0].timestamp);
+  const last = parseTimestampToDate(timestamps[timestamps.length - 1].timestamp);
+
+  const firstMs = first.getTime();
+  const lastMs = last.getTime();
+  if (lastMs <= firstMs) {
+    // fallback: single tick
+    const tick = document.createElement("div");
+    tick.className = "tick";
+    const dd = String(first.getUTCDate()).padStart(2, "0");
+    const mm = String(first.getUTCMonth() + 1).padStart(2, "0");
+    const yyyy = first.getUTCFullYear();
+    tick.style.left = `0%`;
+    tick.innerText = `${dd}-${mm}-${yyyy}`;
+    sliderTicksEl.appendChild(tick);
+    return;
+  }
+
+  // start at midnight UTC of first day
+  let dMs = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate());
+  const endMs = Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), last.getUTCDate());
+
+  while (dMs <= endMs) {
+    let pct = ((dMs - firstMs) / (lastMs - firstMs)) * 100;
+    // clamp pct so ticks don't render outside the track when first timestamp is not midnight
+    pct = Math.max(0, Math.min(100, pct));
+
+    const tick = document.createElement("div");
+    tick.className = "tick";
+    const d = new Date(dMs);
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const yyyy = d.getUTCFullYear();
+    tick.style.left = `${pct}%`;
+    tick.innerText = `${dd}-${mm}-${yyyy}`;
+
+    sliderTicksEl.appendChild(tick);
+
+    dMs += 24 * 60 * 60 * 1000; // next day
+  }
+}
+
+function updateVisualProgress() {
+  if (!sliderProgressEl || !sliderHandleEl) return;
+
+  const max = Math.max(1, parseInt(slider.max) || 1);
+  const pct = (currentIndex / max) * 100;
+
+  sliderProgressEl.style.width = `${pct}%`;
+  sliderHandleEl.style.left = `${pct}%`;
+
+  const ts = timestamps[currentIndex]?.timestamp;
+  const labelText = ts ? formatTimestamp(ts) : "Chưa có dữ liệu";
+  if (sliderHandleLabel) sliderHandleLabel.innerText = labelText;
+
+  // mark active tick if present
+  if (sliderTicksEl) {
+    const ticks = sliderTicksEl.querySelectorAll('.tick');
+    ticks.forEach((t) => t.classList.remove('active'));
+
+    // find tick with same date
+    const curDate = parseTimestampToDate(ts);
+    if (curDate) {
+      const dd = String(curDate.getUTCDate()).padStart(2, "0");
+      const mm = String(curDate.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = curDate.getUTCFullYear();
+      const targetText = `${dd}-${mm}-${yyyy}`;
+      const tick = Array.from(sliderTicksEl.querySelectorAll('.tick')).find(x => x.innerText === targetText);
+      if (tick) tick.classList.add('active');
+    }
+  }
+}
 
 function nextFrame() {
   if (timestamps.length === 0) return;
@@ -248,18 +346,100 @@ function nextFrame() {
     currentIndex = 0;
   }
 
-  renderWeatherLayer(timestamps[currentIndex].timestamp);
+  // visually update and schedule render
+  if (slider) slider.value = currentIndex;
+  updateVisualProgress();
+  scheduleRenderForIndex(currentIndex);
 }
 
 function startPlayback() {
   playbackInterval = setInterval(() => {
     nextFrame();
-  }, 2000);
+  }, PLAYBACK_INTERVAL_MS);
 }
 
 function stopPlayback() {
   clearInterval(playbackInterval);
 }
+
+// Schedule rendering with debounce to avoid spamming GeoServer / APIs
+function scheduleRenderForIndex(index, immediate = false) {
+  if (!timestamps || timestamps.length === 0) return;
+
+  // update current index and visuals immediately
+  currentIndex = index;
+  if (slider) slider.value = currentIndex;
+  updateVisualProgress();
+
+  if (renderTimeout) clearTimeout(renderTimeout);
+
+  if (immediate) {
+    renderWeatherLayer(timestamps[currentIndex].timestamp);
+    return;
+  }
+
+  renderTimeout = setTimeout(() => {
+    // call actual render
+    renderWeatherLayer(timestamps[currentIndex].timestamp);
+  }, RENDER_DEBOUNCE_MS);
+}
+
+// Make the visual slider draggable/clickable
+function enableSliderDrag() {
+  const visual = document.getElementById('slider-visual');
+  if (!visual) return;
+
+  let dragging = false;
+
+  const track = visual.querySelector('.slider-track') || visual;
+
+  function posToIndex(clientX) {
+    const rect = track.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const pct = x / rect.width;
+    const idx = Math.round(pct * (timestamps.length - 1));
+    return idx;
+  }
+
+  function onDown(e) {
+    e.preventDefault();
+    dragging = true;
+    document.body.style.userSelect = 'none';
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const idx = posToIndex(clientX);
+    currentIndex = idx;
+    if (slider) slider.value = currentIndex;
+    updateVisualProgress();
+    scheduleRenderForIndex(idx);
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const idx = posToIndex(clientX);
+    currentIndex = idx;
+    if (slider) slider.value = currentIndex;
+    updateVisualProgress();
+    scheduleRenderForIndex(idx);
+  }
+
+  function onUp(e) {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+    // final render ensured by scheduleRenderForIndex debounce
+  }
+
+  visual.addEventListener('mousedown', onDown);
+  visual.addEventListener('touchstart', onDown, {passive:true});
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove, {passive:true});
+  window.addEventListener('mouseup', onUp);
+  window.addEventListener('touchend', onUp);
+}
+
+// initialize drag behavior after timestamps load
+enableSliderDrag();
 
 // AQI Data
 // fetch("http://localhost:3000/api/aqi")

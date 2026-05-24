@@ -12,24 +12,104 @@ body {
 #timeline-container {
   position: absolute;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 30%;
+  width: 60%;
+  /* transform: translateX(-50%); */
 
   z-index: 2000;
 
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: 12px;
 
   display: flex;
   gap: 12px;
   align-items: center;
 
-  color: white;
+  color: #222;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
 }
 
 #time-slider {
-  width: 400px;
+  width: 100%;
+}
+
+/* hide but keep accessible */
+.visually-hidden {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+}
+
+/* Visual slider elements */
+#slider-visual { width: 100%; }
+.slider-track {
+  position: relative;
+  height: 48px;
+  width: 100%;
+}
+.slider-ticks { position: absolute; inset: 0 0 0 0; pointer-events: none; z-index: 30; }
+.slider-ticks .tick {
+  position: absolute;
+  top: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 11px;
+  color: rgba(0,0,0,0.6);
+  white-space: nowrap;
+}
+.slider-ticks .tick::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 8px;
+  background: #ccc;
+  margin: 0 auto 4px;
+  border-radius: 1px;
+}
+.slider-ticks .tick.active { color: #e74c3c; font-weight:700; }
+.slider-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 8px;
+  width: 0%;
+  background: linear-gradient(90deg,#4aa3f9,#2ecc71);
+  border-radius: 8px;
+  z-index: 10;
+}
+.slider-handle {
+  position: absolute;
+  left: 0%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  cursor: pointer;
+}
+.slider-handle .time-label { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); padding: 4px 6px; border-radius: 4px; font-size: 12px; color:#222; white-space:nowrap; box-shadow:0 3px 8px rgba(0,0,0,0.12); }
+
+/* Play button styles */
+#play-btn { background: transparent; border: none; cursor: pointer; padding: 6px; display:flex; align-items:center; justify-content:center; border-radius:8px; }
+#play-btn svg { display:block }
+
+/* small screens */
+@media (max-width: 480px) {
+  #time-slider { width: 180px; }
+  #slider-visual { width: 240px; }
 }
 
 #play-btn {

@@ -47,6 +47,22 @@ Recently completed:
 - Precipitation → bar chart
 - Wind visualization remains animation-based (no dedicated chart)
 
+Session updates (24-05-2026):
+
+- Implemented an enhanced visual timeline slider with daily ticks and a draggable handle. The slider includes a white blurred background and uses a rounded progress bar with an inline play/pause SVG icon instead of text.
+- Added keyboard/accessibility support by keeping the original range input hidden but synced with the visual slider.
+- Improved tick rendering: daily ticks are generated with UTC-aligned math and clamped to the visual track to avoid overflow when the first timestamp is not at midnight.
+- Interaction fixes: the handle now follows the mouse/touch accurately using the slider track bounding box, and dragging prevents text selection while active.
+- Performance safeguards: requests are debounced (default 600 ms) to avoid request storms to GeoServer and other APIs while the timestamp is changing rapidly.
+- Playback tuning: the play button advances timestamps with a slower default interval (3s) to reduce load and make transitions smoother.
+- Files modified in this session: [index.html](index.html), [style.css](style.css), [main.js](main.js).
+
+Notes & next steps:
+
+- The frontend now debounces all render/feature-info requests. If desired, we can split behavior so WMS tile/time updates happen immediately while only the feature-info (point queries / charts) are debounced.
+- Debounce and playback interval values are tunable constants in `main.js` (`RENDER_DEBOUNCE_MS`, `PLAYBACK_INTERVAL_MS`).
+- Test checklist: verify ticks align after timestamp load, dragging updates the handle and triggers a single render after stopping, play advances without spamming GeoServer.
+
 Planned:
 
 - Improve UI/UX

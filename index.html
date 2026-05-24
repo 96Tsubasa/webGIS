@@ -89,16 +89,34 @@
 
     <div id="wind-toggle">
       <label>
-        <input type="checkbox" id="wind-toggle-input" checked /> Hiển thị Gió
+        <input type="checkbox" id="wind-toggle-input" unchecked /> Gió
       </label>
     </div>
 
     <div id="timeline-container">
-      <button id="play-btn">Play</button>
+      <button id="play-btn" aria-label="Play/Pause">
+        <!-- Play icon (will toggle to pause) -->
+        <svg id="play-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z" fill="#222"/></svg>
+        <svg id="pause-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="#222"/></svg>
+      </button>
 
-      <input type="range" id="time-slider" min="0" max="0" value="0" step="1" />
+      <!-- invisible functional range input (kept for keyboard/accessibility) -->
+      <input class="visually-hidden" type="range" id="time-slider" min="0" max="0" value="0" step="1" />
 
-      <span id="time-label"> Chưa có dữ liệu </span>
+      <!-- Visual slider with ticks and progress -->
+      <div id="slider-visual">
+        <div class="slider-track">
+          <div id="slider-ticks" class="slider-ticks"></div>
+          <div id="slider-progress" class="slider-progress">
+            
+          </div>
+          <div id="slider-handle" class="slider-handle">
+              <div id="slider-time-label" class="time-label">Chưa có dữ liệu</div>
+            </div>
+        </div>
+      </div>
+
+      <!-- <span id="time-label" class="sr-only"> Chưa có dữ liệu </span> -->
     </div>
 
     <!-- Leaflet JS -->
