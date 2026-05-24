@@ -91,116 +91,55 @@ const selectedPointIcon = L.icon({
 // const marker = L.marker([21.0285, 105.8542]).addTo(map).bindPopup("<b>Hà Nội</b><br/>Thủ đô Việt Nam").openPopup();
 
 function renderWeatherLayer(timestamp) {
+  const isoTime = getIsoTime(timestamp);
 
-  const isoTime =
-    getIsoTime(
-      timestamp
-    );
+  if (currentVariable === "wind") {
+    if (weatherLayer) {
+      map.removeLayer(weatherLayer);
 
-  if (
-    currentVariable ===
-    "wind"
-  ) {
-
-    if (
-      weatherLayer
-    ) {
-
-      map.removeLayer(
-        weatherLayer
-      );
-
-      weatherLayer =
-        null;
-
+      weatherLayer = null;
     }
 
-    renderWindAnimation(
-      timestamp
+    renderWindAnimation(timestamp);
+  } else {
+    if (windLayer) {
+      map.removeLayer(windLayer);
+
+      windLayer = null;
+    }
+
+    if (weatherLayer) {
+      map.removeLayer(weatherLayer);
+    }
+
+    weatherLayer = L.tileLayer.wms(
+      "http://localhost:8080/geoserver/weather/wms",
+
+      {
+        layers: VARIABLE_CONFIG[currentVariable].layer,
+
+        format: "image/png",
+
+        transparent: true,
+
+        opacity: VARIABLE_CONFIG[currentVariable].opacity,
+
+        time: isoTime,
+
+        zIndex: 1000,
+      },
     );
 
+    weatherLayer.addTo(map);
   }
 
-  else {
+  slider.value = currentIndex;
 
-    if (
-      windLayer
-    ) {
+  label.innerText = formatTimestamp(timestamp);
 
-      map.removeLayer(
-        windLayer
-      );
-
-      windLayer =
-        null;
-
-    }
-
-    if (
-      weatherLayer
-    ) {
-
-      map.removeLayer(
-        weatherLayer
-      );
-
-    }
-
-    weatherLayer =
-      L.tileLayer.wms(
-
-        "http://localhost:8080/geoserver/weather/wms",
-
-        {
-
-          layers:
-            VARIABLE_CONFIG[
-              currentVariable
-            ].layer,
-
-          format:
-            "image/png",
-
-          transparent:
-            true,
-
-          opacity:
-            VARIABLE_CONFIG[
-              currentVariable
-            ].opacity,
-
-          time:
-            isoTime,
-
-          zIndex:
-            1000
-
-        }
-
-      );
-
-    weatherLayer.addTo(
-      map
-    );
-
-  }
-
-  slider.value =
-    currentIndex;
-
-  label.innerText =
-    formatTimestamp(
-      timestamp
-    );
-
-  if (
-    selectedPoint
-  ) {
-
+  if (selectedPoint) {
     updateInfoPanel();
-
   }
-
 }
 
 // Load timestamps from backend
@@ -541,77 +480,101 @@ map.on("click", async (e) => {
 
 // Render wind
 async function renderWindAnimation(timestamp) {
-  if (windLayer) {
-    map.removeLayer(windLayer);
+  try {
+    if (windLayer) {
+      map.removeLayer(windLayer);
+    }
+
+    const response = await fetch(
+      `http://localhost:3000/api/wind-field?time=${getIsoTime(timestamp)}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Wind API error: ${response.status}`);
+    }
+
+    const field = await response.json();
+
+    console.log("Wind response:", field);
+
+    if (!field || !field.u || !field.v || !field.width || !field.height) {
+      throw new Error("Invalid wind field response");
+    }
+
+    const nx = field.width;
+
+    const ny = field.height;
+
+    const [left, bottom, right, top] = field.bbox;
+
+    const dx = (right - left) / (nx - 1);
+
+    const dy = (top - bottom) / (ny - 1);
+
+    windLayer = L.velocityLayer({
+      displayValues: false,
+
+      data: [
+        {
+          header: {
+            nx,
+
+            ny,
+
+            lo1: left,
+
+            la1: top,
+
+            dx,
+
+            dy,
+
+            parameterCategory: 2,
+
+            parameterNumber: 2,
+          },
+
+          data: field.u.flat(),
+        },
+
+        {
+          header: {
+            nx,
+
+            ny,
+
+            lo1: left,
+
+            la1: top,
+
+            dx,
+
+            dy,
+
+            parameterCategory: 2,
+
+            parameterNumber: 3,
+          },
+
+          data: field.v.flat(),
+        },
+      ],
+
+      velocityScale: 0.003,
+
+      particleAge: 45,
+
+      lineWidth: 1.5,
+
+      frameRate: 40,
+
+      maxVelocity: 15,
+    });
+
+    windLayer.addTo(map);
+
+    console.log("Wind rendered");
+  } catch (err) {
+    console.error("Wind render failed:", err);
   }
-
-  const response = await fetch(
-    `http://localhost:3000/api/wind-field?time=${getIsoTime(timestamp)}`,
-  );
-
-  console.log("Response:", response);
-
-  const field = await response.json();
-
-  windLayer = L.velocityLayer({
-    displayValues: false,
-
-    data: [
-      {
-        header: {
-          nx: field.header.nx,
-
-          ny: field.header.ny,
-
-          lo1: field.header.lo1,
-
-          la1: field.header.la1,
-
-          dx: field.header.dx,
-
-          dy: field.header.dy,
-
-          parameterCategory: 2,
-
-          parameterNumber: 2,
-        },
-
-        data: field.u,
-      },
-
-      {
-        header: {
-          nx: field.header.nx,
-
-          ny: field.header.ny,
-
-          lo1: field.header.lo1,
-
-          la1: field.header.la1,
-
-          dx: field.header.dx,
-
-          dy: field.header.dy,
-
-          parameterCategory: 2,
-
-          parameterNumber: 3,
-        },
-
-        data: field.v,
-      },
-    ],
-
-    velocityScale: 0.005,
-
-    particleAge: 60,
-
-    lineWidth: 2,
-
-    frameRate: 30,
-
-    maxVelocity: 20,
-  });
-
-  windLayer.addTo(map);
 }
