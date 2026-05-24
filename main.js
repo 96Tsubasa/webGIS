@@ -9,6 +9,11 @@ let currentVariable = "temperature";
 let selectedPoint = null;
 let selectedPointMarker = null;
 
+// Chart states
+let temperatureChart = null;
+
+let precipitationChart = null;
+
 const VARIABLE_CONFIG = {
   temperature: {
     layer: "weather:temperature",
@@ -306,7 +311,11 @@ function updateLegend() {
 }
 
 // Helper Query Layer
-async function queryLayer(layerName, latlng) {
+async function queryLayer(
+  layerName,
+  latlng,
+  timestamp = timestamps[currentIndex].timestamp,
+) {
   const bounds = map.getBounds();
 
   const bbox = [
@@ -336,7 +345,7 @@ async function queryLayer(layerName, latlng) {
     `BBOX=${bbox}&` +
     `X=${Math.round(point.x)}&` +
     `Y=${Math.round(point.y)}` +
-    `&TIME=${getIsoTime(timestamps[currentIndex].timestamp)}`;
+    `&TIME=${getIsoTime(timestamp)}`;
 
   const response = await fetch(url);
 
@@ -400,10 +409,6 @@ async function updateInfoPanel() {
 
   document.getElementById("precipitation-text").innerText = loadingText;
 
-  document.getElementById("wind-u-text").innerText = loadingText;
-
-  document.getElementById("wind-v-text").innerText = loadingText;
-
   // Fetch data at selected point
   const [tempText, precipText, windUText, windVText, locationName] =
     await Promise.all([
@@ -458,15 +463,13 @@ async function updateInfoPanel() {
   document.getElementById("precipitation-text").innerText =
     `${precipitation} mm`;
 
-  document.getElementById("wind-u-text").innerText = `${u} m/s`;
-
-  document.getElementById("wind-v-text").innerText = `${v} m/s`;
-
   document.getElementById("wind-text").innerText =
     `${windSpeed.toFixed(2)} m/s`;
 
   document.getElementById("direction-text").innerText =
     `${directionText(angle)}`;
+
+  loadForecastSeries();
 }
 
 // Info Panel Update On Map Click
@@ -577,4 +580,106 @@ async function renderWindAnimation(timestamp) {
   } catch (err) {
     console.error("Wind render failed:", err);
   }
+}
+
+async function loadForecastSeries() {
+  if (!selectedPoint) return;
+
+  const series = await Promise.all(
+    timestamps.map(async ({ timestamp }) => {
+      const [temp, rain, wu, wv] = await Promise.all([
+        queryLayer("weather:temperature", selectedPoint, timestamp),
+
+        queryLayer("weather:precipitation", selectedPoint, timestamp),
+      ]);
+
+      return {
+        timestamp,
+
+        temp: parseFloat(temp.match(/GRAY_INDEX = ([\d.-]+)/)?.[1]),
+
+        rain: parseFloat(rain.match(/GRAY_INDEX = ([\d.-]+)/)?.[1]),
+      };
+    }),
+  );
+
+  renderForecastChart({
+    labels: series.map((x) => formatTimestamp(x.timestamp)),
+
+    temperature: series.map((x) => x.temp),
+
+    precipitation: series.map((x) => x.rain),
+  });
+}
+
+function renderForecastChart(data) {
+  // TEMP
+
+  if (temperatureChart) {
+    temperatureChart.destroy();
+  }
+
+  temperatureChart = new Chart(
+    document.getElementById("temperature-chart"),
+
+    {
+      type: "line",
+
+      data: {
+        labels: data.labels,
+
+        datasets: [
+          {
+            label: "°C",
+
+            data: data.temperature,
+
+            borderColor: "#e74c3c",
+
+            tension: 0.35,
+          },
+        ],
+      },
+
+      options: {
+        responsive: true,
+
+        animation: false,
+      },
+    },
+  );
+
+  // RAIN
+
+  if (precipitationChart) {
+    precipitationChart.destroy();
+  }
+
+  precipitationChart = new Chart(
+    document.getElementById("precipitation-chart"),
+
+    {
+      type: "bar",
+
+      data: {
+        labels: data.labels,
+
+        datasets: [
+          {
+            label: "mm",
+
+            data: data.precipitation,
+
+            backgroundColor: "#3498db",
+          },
+        ],
+      },
+
+      options: {
+        responsive: true,
+
+        animation: false,
+      },
+    },
+  );
 }
