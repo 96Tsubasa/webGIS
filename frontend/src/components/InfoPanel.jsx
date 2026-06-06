@@ -11,7 +11,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
-import { formatTimestamp, queryLayer, reverseGeocode, directionText } from '../utils';
+import { formatTimestamp, queryLayer, reverseGeocode, directionText, getWindDataAtPoint } from '../utils';
 
 ChartJS.register(
   CategoryScale,
@@ -46,12 +46,11 @@ function InfoPanel({ selectedPoint, currentTimestamp, timestamps, onClose }) {
       setLoading(true);
 
       try {
-        const [tempText, precipText, windUText, windVText, locationName] = await Promise.all([
+        const [tempText, precipText, locationName, windData] = await Promise.all([
           queryLayer('weather:temperature', selectedPoint, currentTimestamp),
           queryLayer('weather:precipitation', selectedPoint, currentTimestamp),
-          queryLayer('weather:wind_u', selectedPoint, currentTimestamp),
-          queryLayer('weather:wind_v', selectedPoint, currentTimestamp),
           reverseGeocode(selectedPoint),
+          getWindDataAtPoint(selectedPoint, currentTimestamp)
         ]);
 
         if (!active) return;
@@ -61,10 +60,8 @@ function InfoPanel({ selectedPoint, currentTimestamp, timestamps, onClose }) {
         const temperature = tempMatch ? parseFloat(tempMatch[1]).toFixed(2) : 'No data';
         const precipitation = precipMatch ? parseFloat(precipMatch[1]).toFixed(2) : 'No data';
 
-        const windUMatch = windUText.match(/GRAY_INDEX = ([\d.-]+)/);
-        const windVMatch = windVText.match(/GRAY_INDEX = ([\d.-]+)/);
-        const u = windUMatch ? parseFloat(windUMatch[1]) : 0;
-        const v = windVMatch ? parseFloat(windVMatch[1]) : 0;
+        const u = windData && windData.u !== undefined ? windData.u : 0;
+        const v = windData && windData.v !== undefined ? windData.v : 0;
         const windSpeed = Math.sqrt(u * u + v * v);
         const angle = ((Math.atan2(u, v) * 180) / Math.PI + 360) % 360;
 

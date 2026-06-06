@@ -93,3 +93,31 @@ export function directionText(a) {
   if (a < 337.5) return 'Tây Bắc';
   return 'Bắc';
 }
+
+export async function getWindDataAtPoint(latlng, timestamp) {
+  try {
+    const response = await fetch(`/api/wind-field?time=${getIsoTime(timestamp)}`);
+    if (!response.ok) return null;
+    const field = await response.json();
+    
+    const { width: nx, height: ny, bbox, u, v } = field;
+    const [left, bottom, right, top] = bbox;
+    
+    const dx = (right - left) / (nx - 1);
+    const dy = (top - bottom) / (ny - 1);
+    
+    let x = Math.round((latlng.lng - left) / dx);
+    let y = Math.round((top - latlng.lat) / dy);
+    
+    if (x < 0) x = 0; if (x >= nx) x = nx - 1;
+    if (y < 0) y = 0; if (y >= ny) y = ny - 1;
+    
+    const uVal = u[y][x];
+    const vVal = v[y][x];
+    
+    return { u: uVal, v: vVal };
+  } catch (e) {
+    console.error("Error fetching wind point:", e);
+    return null;
+  }
+}

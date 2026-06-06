@@ -23,7 +23,8 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
   useEffect(() => {
     if (!mapRef.current) return;
     
-    const map = L.map(mapRef.current).setView([16.311, 106.062], 6);
+    const map = L.map(mapRef.current, { zoomControl: false }).setView([16.311, 106.062], 6);
+    L.control.zoom({ position: 'topright' }).addTo(map);
     mapInstanceRef.current = map;
 
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -152,6 +153,8 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
       } else {
         markerRef.current.setLatLng(selectedPoint);
       }
+      const currentZoom = map.getZoom();
+      map.flyTo(selectedPoint, currentZoom < 10 ? 10 : currentZoom, { duration: 1.5 });
     } else {
       if (markerRef.current) {
         map.removeLayer(markerRef.current);

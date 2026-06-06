@@ -4,6 +4,7 @@ import Timeline from './components/Timeline';
 import InfoPanel from './components/InfoPanel';
 import Controls from './components/Controls';
 import Legend from './components/Legend';
+import SearchBar from './components/SearchBar';
 import './index.css';
 import 'leaflet/dist/leaflet.css';
 
@@ -76,6 +77,8 @@ function App() {
           onClose={() => setSelectedPoint(null)}
         />
       )}
+
+      <SearchBar onLocationSelect={setSelectedPoint} />
 
       <Legend currentVariable={currentVariable} />
 
