@@ -52,6 +52,8 @@ body {
   position: relative;
   height: 48px;
   width: 100%;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
 }
 .slider-ticks { position: absolute; inset: 0 0 0 0; pointer-events: none; z-index: 30; }
 .slider-ticks .tick {

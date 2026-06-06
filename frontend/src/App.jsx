@@ -18,7 +18,7 @@ function App() {
   useEffect(() => {
     async function loadTimestamps() {
       try {
-        const res = await fetch(`http://localhost:3000/api/timestamps?variable=${currentVariable}`);
+        const res = await fetch(`/api/timestamps?variable=${currentVariable}`);
         const data = await res.json();
         setTimestamps(data);
 

@@ -1,8 +1,24 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { formatTimestamp, parseTimestampToDate } from '../utils';
 
 function Timeline({ timestamps, currentIndex, onChangeIndex, isPlaying, onPlayToggle }) {
   const visualRef = useRef(null);
+  const [displayIndex, setDisplayIndex] = useState(currentIndex);
+
+  // Sync displayIndex when currentIndex changes externally (e.g. Playback)
+  useEffect(() => {
+    setDisplayIndex(currentIndex);
+  }, [currentIndex]);
+
+  // Debounce the slider drag
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (displayIndex !== currentIndex) {
+        onChangeIndex(displayIndex);
+      }
+    }, 600);
+    return () => clearTimeout(timeout);
+  }, [displayIndex, currentIndex, onChangeIndex]);
   
   // Handling Playback
   useEffect(() => {
@@ -37,13 +53,13 @@ function Timeline({ timestamps, currentIndex, onChangeIndex, isPlaying, onPlayTo
       dragging = true;
       document.body.style.userSelect = 'none';
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      onChangeIndex(posToIndex(clientX));
+      setDisplayIndex(posToIndex(clientX));
     }
 
     function onMove(e) {
       if (!dragging) return;
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      onChangeIndex(posToIndex(clientX));
+      setDisplayIndex(posToIndex(clientX));
     }
 
     function onUp() {
@@ -70,9 +86,9 @@ function Timeline({ timestamps, currentIndex, onChangeIndex, isPlaying, onPlayTo
   }, [timestamps, onChangeIndex]);
 
   const max = Math.max(1, timestamps.length - 1);
-  const pct = (currentIndex / max) * 100 || 0;
+  const pct = (displayIndex / max) * 100 || 0;
   
-  const currentTs = timestamps[currentIndex]?.timestamp;
+  const currentTs = timestamps[displayIndex]?.timestamp;
   const labelText = currentTs ? formatTimestamp(currentTs) : "Chưa có dữ liệu";
 
   // Calculate ticks
@@ -129,7 +145,7 @@ function Timeline({ timestamps, currentIndex, onChangeIndex, isPlaying, onPlayTo
         id="time-slider" 
         min="0" 
         max={max} 
-        value={currentIndex} 
+        value={displayIndex} 
         readOnly 
       />
 

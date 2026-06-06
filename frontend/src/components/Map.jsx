@@ -68,7 +68,7 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
       map.removeLayer(weatherLayerRef.current);
     }
 
-    const newWeatherLayer = L.tileLayer.wms('http://localhost:8080/geoserver/weather/wms', {
+    const newWeatherLayer = L.tileLayer.wms('/geoserver/weather/wms', {
       layers: VARIABLE_CONFIG[currentVariable].layer,
       format: 'image/png',
       transparent: true,
@@ -98,7 +98,7 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
       if (!timestamp) return;
 
       try {
-        const response = await fetch(`http://localhost:3000/api/wind-field?time=${getIsoTime(timestamp)}`);
+        const response = await fetch(`/api/wind-field?time=${getIsoTime(timestamp)}`);
         if (!response.ok) throw new Error(`Wind API error: ${response.status}`);
         
         const field = await response.json();

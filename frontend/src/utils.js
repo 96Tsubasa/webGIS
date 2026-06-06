@@ -48,7 +48,7 @@ export async function queryLayer(layerName, latlng, timestamp) {
   // The original code used map bounds and size, but for WMS GetFeatureInfo on a specific point, 
   // calculating a small bbox around the point and clicking the center (X=50, Y=50 in a 100x100 grid) works exactly the same.
   const url =
-    `http://localhost:3000/api/feature-info?` +
+    `/api/feature-info?` +
     `SERVICE=WMS&` +
     `VERSION=1.1.1&` +
     `REQUEST=GetFeatureInfo&` +
@@ -72,7 +72,7 @@ export async function queryLayer(layerName, latlng, timestamp) {
 export async function reverseGeocode(latlng) {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/reverse-geocode?lat=${latlng.lat}&lon=${latlng.lng}`
+      `/api/reverse-geocode?lat=${latlng.lat}&lon=${latlng.lng}`
     );
     const data = await response.json();
     return data.display_name;
