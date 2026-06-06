@@ -22,12 +22,13 @@ export function getIsoTime(timestamp) {
 }
 
 export function formatTimestamp(ts) {
-  if (!ts) return '';
-  const year = ts.slice(0, 4);
-  const month = ts.slice(4, 6);
-  const day = ts.slice(6, 8);
-  const hour = ts.slice(9, 11);
-  return `${hour}:00 ${day}/${month}/${year}`;
+  const d = parseTimestampToDate(ts);
+  if (!d) return '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  return `${hh}:00 ${dd}/${mm}/${yyyy}`;
 }
 
 export function parseTimestampToDate(ts) {
