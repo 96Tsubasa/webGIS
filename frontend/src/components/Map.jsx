@@ -22,7 +22,7 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
   // Init Map
   useEffect(() => {
     if (!mapRef.current) return;
-    
+
     const map = L.map(mapRef.current, { zoomControl: false }).setView([16.311, 106.062], 6);
     L.control.zoom({ position: 'topright' }).addTo(map);
     mapInstanceRef.current = map;
@@ -101,7 +101,7 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
       try {
         const response = await fetch(`/api/wind-field?time=${getIsoTime(timestamp)}`);
         if (!response.ok) throw new Error(`Wind API error: ${response.status}`);
-        
+
         const field = await response.json();
         if (!field || !field.u || !field.v || !field.width || !field.height) {
           throw new Error('Invalid wind field response');
@@ -125,8 +125,8 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
               data: field.v.flat(),
             },
           ],
-          velocityScale: 0.005,
-          particleAge: 60,
+          velocityScale: 0.01,
+          particleAge: 100,
           lineWidth: 2,
           frameRate: 40,
           maxVelocity: 25,
@@ -154,7 +154,7 @@ function MapComponent({ timestamps, currentIndex, currentVariable, windOn, selec
         markerRef.current.setLatLng(selectedPoint);
       }
       const currentZoom = map.getZoom();
-      map.flyTo(selectedPoint, currentZoom < 10 ? 10 : currentZoom, { duration: 1.5 });
+      map.flyTo(selectedPoint, currentZoom < 8 ? 8 : currentZoom, { duration: 1.5 });
     } else {
       if (markerRef.current) {
         map.removeLayer(markerRef.current);
