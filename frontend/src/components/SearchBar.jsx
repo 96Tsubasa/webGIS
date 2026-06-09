@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 function SearchBar({ onLocationSelect }) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const isSelectingRef = useRef(false);
 
   useEffect(() => {
     if (!query.trim()) {
       setSuggestions([]);
       setIsOpen(false);
+      return;
+    }
+
+    if (isSelectingRef.current) {
       return;
     }
 
@@ -35,9 +40,11 @@ function SearchBar({ onLocationSelect }) {
   }, [query]);
 
   const handleSelect = (item) => {
+    isSelectingRef.current = true;
     const latlng = { lat: parseFloat(item.lat), lng: parseFloat(item.lon) };
     onLocationSelect(latlng);
     setQuery(item.display_name);
+    setSuggestions([]);
     setIsOpen(false);
   };
 
@@ -49,7 +56,10 @@ function SearchBar({ onLocationSelect }) {
         autoComplete="off"
         placeholder="Tìm kiếm địa điểm tại Việt Nam..."
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          isSelectingRef.current = false;
+          setQuery(e.target.value);
+        }}
         onFocus={() => {
           if (suggestions.length > 0) setIsOpen(true);
         }}

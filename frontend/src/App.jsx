@@ -21,7 +21,11 @@ function App() {
       try {
         const res = await fetch(`/api/timestamps?variable=${currentVariable}`);
         const data = await res.json();
-        setTimestamps(data);
+        
+        setTimestamps((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+          return data;
+        });
 
         if (data.length > 0) {
           const now = new Date();
@@ -53,10 +57,6 @@ function App() {
     loadTimestamps();
   }, [currentVariable]);
 
-  // Set default selected point (Hanoi) on initial mount
-  useEffect(() => {
-    setSelectedPoint({ lat: 21.0285, lng: 105.8542 });
-  }, []);
 
   return (
     <>
